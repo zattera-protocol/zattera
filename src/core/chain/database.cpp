@@ -1,0 +1,3967 @@
+#include <zattera/protocol/zattera_operations.hpp>
+
+#include <zattera/chain/block_summary_object.hpp>
+#include <zattera/chain/custom_operation_interpreter.hpp>
+#include <zattera/chain/database.hpp>
+#include <zattera/chain/database_exceptions.hpp>
+#include <zattera/chain/db_with.hpp>
+#include <zattera/chain/evaluator_registry.hpp>
+#include <zattera/chain/global_property_object.hpp>
+#include <zattera/chain/history_object.hpp>
+#include <zattera/chain/index.hpp>
+#include <zattera/chain/zattera_evaluator.hpp>
+#include <zattera/chain/zattera_objects.hpp>
+#include <zattera/chain/transaction_object.hpp>
+#include <zattera/chain/shared_db_merkle.hpp>
+#include <zattera/chain/operation_notification.hpp>
+#include <zattera/chain/witness_schedule.hpp>
+
+#include <zattera/chain/utils/asset.hpp>
+#include <zattera/chain/utils/reward.hpp>
+#include <zattera/chain/utils/uint256.hpp>
+#include <zattera/chain/utils/reward.hpp>
+
+#include <fc/smart_ref_impl.hpp>
+#include <fc/uint128.hpp>
+
+#include <fc/container/deque.hpp>
+
+#include <fc/io/fstream.hpp>
+
+#include <boost/scope_exit.hpp>
+
+#include <cstdint>
+#include <deque>
+#include <fstream>
+#include <functional>
+
+namespace zattera { namespace chain {
+
+struct object_schema_repr
+{
+   std::pair< uint16_t, uint16_t > space_type;
+   std::string type;
+};
+
+struct operation_schema_repr
+{
+   std::string id;
+   std::string type;
+};
+
+struct db_schema
+{
+   std::map< std::string, std::string > types;
+   std::vector< object_schema_repr > object_types;
+   std::string operation_type;
+   std::vector< operation_schema_repr > custom_operation_types;
+};
+
+} }
+
+FC_REFLECT( zattera::chain::object_schema_repr, (space_type)(type) )
+FC_REFLECT( zattera::chain::operation_schema_repr, (id)(type) )
+FC_REFLECT( zattera::chain::db_schema, (types)(object_types)(operation_type)(custom_operation_types) )
+
+namespace zattera { namespace chain {
+
+using boost::container::flat_set;
+
+struct reward_fund_context
+{
+   uint128_t   recent_claims = 0;
+   asset       reward_balance = asset( 0, ZTR_SYMBOL );
+   share_type  ztr_awarded = 0;
+};
+
+class database_impl
+{
+   public:
+      database_impl( database& self );
+
+      database&                              _self;
+      evaluator_registry< operation >        _evaluator_registry;
+};
+
+database_impl::database_impl( database& self )
+   : _self(self), _evaluator_registry(self) {}
+
+database::database()
+   : _my( new database_impl(*this) )
+{
+   set_chain_id( ZATTERA_CHAIN_ID_NAME );
+}
+
+database::~database()
+{
+   clear_pending();
+}
+
+void database::open( const open_args& args )
+{
+   try
+   {
+      init_schema();
+      chainbase::database::open( args.shared_mem_dir, args.chainbase_flags, args.shared_file_size );
+
+      initialize_indexes();
+      initialize_evaluators();
+
+      if( !find< dynamic_global_property_object >() )
+         with_write_lock( [&]()
+         {
+            init_genesis( args.initial_supply );
+         });
+
+      _benchmark_dumper.set_enabled( args.benchmark_is_enabled );
+
+      _block_log.open( args.data_dir / "block_log" );
+
+      auto log_head = _block_log.head();
+
+      // Rewind all undo state. This should return us to the state at the last irreversible block.
+      with_write_lock( [&]()
+      {
+         undo_all();
+         FC_ASSERT( revision() == head_block_num(), "Chainbase revision does not match head block num",
+            ("rev", revision())("head_block", head_block_num()) );
+         if (args.do_validate_invariants)
+            validate_invariants();
+      });
+
+      if( head_block_num() )
+      {
+         auto head_block = _block_log.read_block_by_num( head_block_num() );
+         // This assertion should be caught and a reindex should occur
+         FC_ASSERT( head_block.valid() && head_block->id() == head_block_id(), "Chain state does not match block log. Please reindex blockchain." );
+
+         _fork_db.start_block( *head_block );
+      }
+
+      with_read_lock( [&]()
+      {
+         init_hardforks(); // Writes to local state, but reads from db
+      });
+
+      if (args.benchmark.first)
+      {
+         args.benchmark.second(0, get_abstract_index_cntr());
+         auto last_block_num = _block_log.head()->block_num();
+         args.benchmark.second(last_block_num, get_abstract_index_cntr());
+      }
+
+      _shared_file_full_threshold = args.shared_file_full_threshold;
+      _shared_file_scale_rate = args.shared_file_scale_rate;
+   }
+   FC_CAPTURE_LOG_AND_RETHROW( (args.data_dir)(args.shared_mem_dir)(args.shared_file_size) )
+}
+
+uint32_t database::reindex( const open_args& args )
+{
+   reindex_notification note;
+
+   BOOST_SCOPE_EXIT(this_,&note) {
+      ZATTERA_TRY_NOTIFY(this_->_post_reindex_signal, note);
+   } BOOST_SCOPE_EXIT_END
+
+   try
+   {
+      ZATTERA_TRY_NOTIFY(_pre_reindex_signal, note);
+
+      ilog( "Reindexing Blockchain" );
+      wipe( args.data_dir, args.shared_mem_dir, false );
+      open( args );
+      _fork_db.reset();    // override effect of _fork_db.start_block() call in open()
+
+      auto start = fc::time_point::now();
+      ZATTERA_ASSERT( _block_log.head(), block_log_exception, "No blocks in block log. Cannot reindex an empty chain." );
+
+      ilog( "Replaying blocks..." );
+
+      uint64_t skip_flags =
+         skip_witness_signature |
+         skip_transaction_signatures |
+         skip_transaction_dupe_check |
+         skip_tapos_check |
+         skip_merkle_check |
+         skip_witness_schedule_check |
+         skip_authority_check |
+         skip_validate | /// no need to validate operations
+         skip_validate_invariants |
+         skip_block_log;
+
+      with_write_lock( [&]()
+      {
+         _block_log.set_locking( false );
+         auto itr = _block_log.read_block( 0 );
+         auto last_block_num = _block_log.head()->block_num();
+         if( args.stop_replay_at > 0 && args.stop_replay_at < last_block_num )
+            last_block_num = args.stop_replay_at;
+         if( args.benchmark.first > 0 )
+         {
+            args.benchmark.second( 0, get_abstract_index_cntr() );
+         }
+
+         while( itr.first.block_num() != last_block_num )
+         {
+            auto cur_block_num = itr.first.block_num();
+            if( cur_block_num % 100000 == 0 )
+               std::cerr << "   " << double( cur_block_num * 100 ) / last_block_num << "%   " << cur_block_num << " of " << last_block_num <<
+               "   (" << (get_free_memory() / (1024*1024)) << "M free)\n";
+            apply_block( itr.first, skip_flags );
+
+            if( (args.benchmark.first > 0) && (cur_block_num % args.benchmark.first == 0) )
+               args.benchmark.second( cur_block_num, get_abstract_index_cntr() );
+            itr = _block_log.read_block( itr.second );
+         }
+
+         apply_block( itr.first, skip_flags );
+         note.last_block_number = itr.first.block_num();
+
+         if( (args.benchmark.first > 0) && (note.last_block_number % args.benchmark.first == 0) )
+            args.benchmark.second( note.last_block_number, get_abstract_index_cntr() );
+         set_revision( head_block_num() );
+         _block_log.set_locking( true );
+      });
+
+      if( _block_log.head()->block_num() )
+         _fork_db.start_block( *_block_log.head() );
+
+      auto end = fc::time_point::now();
+      ilog( "Done reindexing, elapsed time: ${t} sec", ("t",double((end-start).count())/1000000.0 ) );
+
+      note.reindex_success = true;
+
+      return note.last_block_number;
+   }
+   FC_CAPTURE_AND_RETHROW( (args.data_dir)(args.shared_mem_dir) )
+
+}
+
+void database::wipe( const fc::path& data_dir, const fc::path& shared_mem_dir, bool include_blocks)
+{
+   close();
+   chainbase::database::wipe( shared_mem_dir );
+   if( include_blocks )
+   {
+      fc::remove_all( data_dir / "block_log" );
+      fc::remove_all( data_dir / "block_log.index" );
+   }
+}
+
+void database::close(bool rewind)
+{
+   try
+   {
+      // Since pop_block() will move tx's in the popped blocks into pending,
+      // we have to clear_pending() after we're done popping to get a clean
+      // DB state (issue #336).
+      clear_pending();
+
+      chainbase::database::flush();
+      chainbase::database::close();
+
+      _block_log.close();
+
+      _fork_db.reset();
+   }
+   FC_CAPTURE_AND_RETHROW()
+}
+
+bool database::is_known_block( const block_id_type& id )const
+{ try {
+   return fetch_block_by_id( id ).valid();
+} FC_CAPTURE_AND_RETHROW() }
+
+/**
+ * Only return true *if* the transaction has not expired or been invalidated. If this
+ * method is called with a VERY old transaction we will return false, they should
+ * query things by blocks if they are that old.
+ */
+bool database::is_known_transaction( const transaction_id_type& id )const
+{ try {
+   const auto& trx_idx = get_index<transaction_index>().indices().get<by_trx_id>();
+   return trx_idx.find( id ) != trx_idx.end();
+} FC_CAPTURE_AND_RETHROW() }
+
+block_id_type database::find_block_id_for_num( uint32_t block_num )const
+{
+   try
+   {
+      if( block_num == 0 )
+         return block_id_type();
+
+      // Reversible blocks are *usually* in the TAPOS buffer.  Since this
+      // is the fastest check, we do it first.
+      block_summary_id_type bsid = block_num & 0xFFFF;
+      const block_summary_object* bs = find< block_summary_object, by_id >( bsid );
+      if( bs != nullptr )
+      {
+         if( protocol::block_header::num_from_id(bs->block_id) == block_num )
+            return bs->block_id;
+      }
+
+      // Next we query the block log.   Irreversible blocks are here.
+      auto b = _block_log.read_block_by_num( block_num );
+      if( b.valid() )
+         return b->id();
+
+      // Finally we query the fork DB.
+      shared_ptr< fork_item > fitem = _fork_db.fetch_block_on_main_branch_by_number( block_num );
+      if( fitem )
+         return fitem->id;
+
+      return block_id_type();
+   }
+   FC_CAPTURE_AND_RETHROW( (block_num) )
+}
+
+block_id_type database::get_block_id_for_num( uint32_t block_num )const
+{
+   block_id_type bid = find_block_id_for_num( block_num );
+   FC_ASSERT( bid != block_id_type() );
+   return bid;
+}
+
+
+optional<signed_block> database::fetch_block_by_id( const block_id_type& id )const
+{ try {
+   auto b = _fork_db.fetch_block( id );
+   if( !b )
+   {
+      auto tmp = _block_log.read_block_by_num( protocol::block_header::num_from_id( id ) );
+
+      if( tmp && tmp->id() == id )
+         return tmp;
+
+      tmp.reset();
+      return tmp;
+   }
+
+   return b->data;
+} FC_CAPTURE_AND_RETHROW() }
+
+optional<signed_block> database::fetch_block_by_number( uint32_t block_num )const
+{ try {
+   optional< signed_block > b;
+
+   auto results = _fork_db.fetch_block_by_number( block_num );
+   if( results.size() == 1 )
+      b = results[0]->data;
+   else
+      b = _block_log.read_block_by_num( block_num );
+
+   return b;
+} FC_LOG_AND_RETHROW() }
+
+const signed_transaction database::get_recent_transaction( const transaction_id_type& trx_id ) const
+{ try {
+   auto& index = get_index<transaction_index>().indices().get<by_trx_id>();
+   auto itr = index.find(trx_id);
+   FC_ASSERT(itr != index.end());
+   signed_transaction trx;
+   fc::raw::unpack_from_buffer( itr->packed_trx, trx );
+   return trx;;
+} FC_CAPTURE_AND_RETHROW() }
+
+std::vector< block_id_type > database::get_block_ids_on_fork( block_id_type head_of_fork ) const
+{ try {
+   pair<fork_database::branch_type, fork_database::branch_type> branches = _fork_db.fetch_branch_from(head_block_id(), head_of_fork);
+   if( !((branches.first.back()->previous_id() == branches.second.back()->previous_id())) )
+   {
+      edump( (head_of_fork)
+             (head_block_id())
+             (branches.first.size())
+             (branches.second.size()) );
+      assert(branches.first.back()->previous_id() == branches.second.back()->previous_id());
+   }
+   std::vector< block_id_type > result;
+   for( const item_ptr& fork_block : branches.second )
+      result.emplace_back(fork_block->id);
+   result.emplace_back(branches.first.back()->previous_id());
+   return result;
+} FC_CAPTURE_AND_RETHROW() }
+
+chain_id_type database::get_chain_id() const
+{
+   return zattera_chain_id;
+}
+
+void database::set_chain_id( const std::string& _chain_id_name )
+{
+   zattera_chain_id = generate_chain_id( _chain_id_name );
+}
+
+void database::foreach_block(std::function<bool(const signed_block_header&, const signed_block&)> processor) const
+{
+   if(!_block_log.head())
+      return;
+
+   auto itr = _block_log.read_block( 0 );
+   auto last_block_num = _block_log.head()->block_num();
+   signed_block_header previousBlockHeader = itr.first;
+   while( itr.first.block_num() != last_block_num )
+   {
+      const signed_block& b = itr.first;
+      if(processor(previousBlockHeader, b) == false)
+         return;
+
+      previousBlockHeader = b;
+      itr = _block_log.read_block( itr.second );
+   }
+
+   processor(previousBlockHeader, itr.first);
+}
+
+void database::foreach_tx(std::function<bool(const signed_block_header&, const signed_block&,
+   const signed_transaction&, uint32_t)> processor) const
+{
+   foreach_block([&processor](const signed_block_header& prevBlockHeader, const signed_block& block) -> bool
+   {
+      uint32_t txInBlock = 0;
+      for( const auto& trx : block.transactions )
+      {
+         if(processor(prevBlockHeader, block, trx, txInBlock) == false)
+            return false;
+         ++txInBlock;
+      }
+
+      return true;
+   }
+   );
+}
+
+void database::foreach_operation(std::function<bool(const signed_block_header&,const signed_block&,
+   const signed_transaction&, uint32_t, const operation&, uint16_t)> processor) const
+{
+   foreach_tx([&processor](const signed_block_header& prevBlockHeader, const signed_block& block,
+      const signed_transaction& tx, uint32_t txInBlock) -> bool
+   {
+      uint16_t opInTx = 0;
+      for(const auto& op : tx.operations)
+      {
+         if(processor(prevBlockHeader, block, tx, txInBlock, op, opInTx) == false)
+            return false;
+         ++opInTx;
+      }
+
+      return true;
+   }
+   );
+}
+
+
+const witness_object& database::get_witness( const account_name_type& name ) const
+{ try {
+   return get< witness_object, by_name >( name );
+} FC_CAPTURE_AND_RETHROW( (name) ) }
+
+const witness_object* database::find_witness( const account_name_type& name ) const
+{
+   return find< witness_object, by_name >( name );
+}
+
+const account_object& database::get_account( const account_name_type& name )const
+{ try {
+   return get< account_object, by_name >( name );
+} FC_CAPTURE_AND_RETHROW( (name) ) }
+
+const account_object* database::find_account( const account_name_type& name )const
+{
+   return find< account_object, by_name >( name );
+}
+
+const comment_object& database::get_comment( const account_name_type& author, const shared_string& permlink )const
+{ try {
+   return get< comment_object, by_permlink >( boost::make_tuple( author, permlink ) );
+} FC_CAPTURE_AND_RETHROW( (author)(permlink) ) }
+
+const comment_object* database::find_comment( const account_name_type& author, const shared_string& permlink )const
+{
+   return find< comment_object, by_permlink >( boost::make_tuple( author, permlink ) );
+}
+
+#ifndef ENABLE_STD_ALLOCATOR
+const comment_object& database::get_comment( const account_name_type& author, const string& permlink )const
+{ try {
+   return get< comment_object, by_permlink >( boost::make_tuple( author, permlink) );
+} FC_CAPTURE_AND_RETHROW( (author)(permlink) ) }
+
+const comment_object* database::find_comment( const account_name_type& author, const string& permlink )const
+{
+   return find< comment_object, by_permlink >( boost::make_tuple( author, permlink ) );
+}
+#endif
+
+const escrow_object& database::get_escrow( const account_name_type& name, uint32_t escrow_id )const
+{ try {
+   return get< escrow_object, by_from_id >( boost::make_tuple( name, escrow_id ) );
+} FC_CAPTURE_AND_RETHROW( (name)(escrow_id) ) }
+
+const escrow_object* database::find_escrow( const account_name_type& name, uint32_t escrow_id )const
+{
+   return find< escrow_object, by_from_id >( boost::make_tuple( name, escrow_id ) );
+}
+
+const limit_order_object& database::get_limit_order( const account_name_type& name, uint32_t orderid )const
+{ try {
+   return get< limit_order_object, by_account >( boost::make_tuple( name, orderid ) );
+} FC_CAPTURE_AND_RETHROW( (name)(orderid) ) }
+
+const limit_order_object* database::find_limit_order( const account_name_type& name, uint32_t orderid )const
+{
+   return find< limit_order_object, by_account >( boost::make_tuple( name, orderid ) );
+}
+
+const savings_withdraw_object& database::get_savings_withdraw( const account_name_type& owner, uint32_t request_id )const
+{ try {
+   return get< savings_withdraw_object, by_from_rid >( boost::make_tuple( owner, request_id ) );
+} FC_CAPTURE_AND_RETHROW( (owner)(request_id) ) }
+
+const savings_withdraw_object* database::find_savings_withdraw( const account_name_type& owner, uint32_t request_id )const
+{
+   return find< savings_withdraw_object, by_from_rid >( boost::make_tuple( owner, request_id ) );
+}
+
+const dynamic_global_property_object&database::get_dynamic_global_properties() const
+{ try {
+   return get< dynamic_global_property_object >();
+} FC_CAPTURE_AND_RETHROW() }
+
+const node_property_object& database::get_node_properties() const
+{
+   return _node_property_object;
+}
+
+const feed_history_object& database::get_feed_history()const
+{ try {
+   return get< feed_history_object >();
+} FC_CAPTURE_AND_RETHROW() }
+
+const witness_schedule_object& database::get_witness_schedule_object()const
+{ try {
+   return get< witness_schedule_object >();
+} FC_CAPTURE_AND_RETHROW() }
+
+const hardfork_property_object& database::get_hardfork_property_object()const
+{ try {
+   return get< hardfork_property_object >();
+} FC_CAPTURE_AND_RETHROW() }
+
+const time_point_sec database::calculate_discussion_payout_time( const comment_object& comment )const
+{
+   return comment.cashout_time;
+}
+
+const reward_fund_object& database::get_reward_fund( const comment_object& c ) const
+{
+   return get< reward_fund_object, by_name >( ZATTERA_POST_REWARD_FUND_NAME );
+}
+
+asset database::get_effective_vesting_shares( const account_object& account, asset_symbol_type vested_symbol )const
+{
+   if( vested_symbol == VESTS_SYMBOL )
+      return account.vesting_shares - account.delegated_vesting_shares + account.received_vesting_shares;
+
+   FC_ASSERT( false, "Invalid symbol" );
+}
+
+uint32_t database::witness_participation_rate()const
+{
+   const dynamic_global_property_object& dpo = get_dynamic_global_properties();
+   return uint64_t(ZATTERA_100_PERCENT) * dpo.recent_slots_filled.popcount() / 128;
+}
+
+void database::add_checkpoints( const flat_map< uint32_t, block_id_type >& checkpts )
+{
+   for( const auto& i : checkpts )
+      _checkpoints[i.first] = i.second;
+}
+
+bool database::before_last_checkpoint()const
+{
+   return (_checkpoints.size() > 0) && (_checkpoints.rbegin()->first >= head_block_num());
+}
+
+/**
+ * Push block "may fail" in which case every partial change is unwound.  After
+ * push block is successful the block is appended to the chain database on disk.
+ *
+ * @return true if we switched forks as a result of this push.
+ */
+bool database::push_block(const signed_block& new_block, uint32_t skip)
+{
+   //fc::time_point begin_time = fc::time_point::now();
+
+   bool result;
+   detail::with_skip_flags( *this, skip, [&]()
+   {
+      detail::without_pending_transactions( *this, std::move(_pending_tx), [&]()
+      {
+         try
+         {
+            result = _push_block(new_block);
+         }
+         FC_CAPTURE_AND_RETHROW( (new_block) )
+
+         check_free_memory( false, new_block.block_num() );
+      });
+   });
+
+   //fc::time_point end_time = fc::time_point::now();
+   //fc::microseconds dt = end_time - begin_time;
+   //if( ( new_block.block_num() % 10000 ) == 0 )
+   //   ilog( "push_block ${b} took ${t} microseconds", ("b", new_block.block_num())("t", dt.count()) );
+   return result;
+}
+
+void database::_maybe_warn_multiple_production( uint32_t height )const
+{
+   auto blocks = _fork_db.fetch_block_by_number( height );
+   if( blocks.size() > 1 )
+   {
+      vector< std::pair< account_name_type, fc::time_point_sec > > witness_time_pairs;
+      for( const auto& b : blocks )
+      {
+         witness_time_pairs.push_back( std::make_pair( b->data.witness, b->data.timestamp ) );
+      }
+
+      ilog( "Encountered block num collision at block ${n} due to a fork, witnesses are: ${w}", ("n", height)("w", witness_time_pairs) );
+   }
+   return;
+}
+
+bool database::_push_block(const signed_block& new_block)
+{ try {
+   #ifdef IS_TEST_NET
+   FC_ASSERT(new_block.block_num() < TESTNET_BLOCK_LIMIT, "Testnet block limit exceeded");
+   #endif /// IS_TEST_NET
+
+   uint32_t skip = get_node_properties().skip_flags;
+   //uint32_t skip_undo_db = skip & skip_undo_block;
+
+   if( !(skip&skip_fork_db) )
+   {
+      shared_ptr<fork_item> new_head = _fork_db.push_block(new_block);
+      _maybe_warn_multiple_production( new_head->num );
+
+      //If the head block from the longest chain does not build off of the current head, we need to switch forks.
+      if( new_head->data.previous != head_block_id() )
+      {
+         //If the newly pushed block is the same height as head, we get head back in new_head
+         //Only switch forks if new_head is actually higher than head
+         if( new_head->data.block_num() > head_block_num() )
+         {
+            // wlog( "Switching to fork: ${id}", ("id",new_head->data.id()) );
+            auto branches = _fork_db.fetch_branch_from(new_head->data.id(), head_block_id());
+
+            // pop blocks until we hit the forked block
+            while( head_block_id() != branches.second.back()->data.previous )
+               pop_block();
+
+            // push all blocks on the new fork
+            for( auto ritr = branches.first.rbegin(); ritr != branches.first.rend(); ++ritr )
+            {
+                // ilog( "pushing blocks from fork ${n} ${id}", ("n",(*ritr)->data.block_num())("id",(*ritr)->data.id()) );
+                optional<fc::exception> except;
+                try
+                {
+                   auto session = start_undo_session();
+                   apply_block( (*ritr)->data, skip );
+                   session.push();
+                }
+                catch ( const fc::exception& e ) { except = e; }
+                if( except )
+                {
+                   // wlog( "exception thrown while switching forks ${e}", ("e",except->to_detail_string() ) );
+                   // remove the rest of branches.first from the fork_db, those blocks are invalid
+                   while( ritr != branches.first.rend() )
+                   {
+                      _fork_db.remove( (*ritr)->data.id() );
+                      ++ritr;
+                   }
+                   _fork_db.set_head( branches.second.front() );
+
+                   // pop all blocks from the bad fork
+                   while( head_block_id() != branches.second.back()->data.previous )
+                      pop_block();
+
+                   // restore all blocks from the good fork
+                   for( auto ritr = branches.second.rbegin(); ritr != branches.second.rend(); ++ritr )
+                   {
+                      auto session = start_undo_session();
+                      apply_block( (*ritr)->data, skip );
+                      session.push();
+                   }
+                   throw *except;
+                }
+            }
+            return true;
+         }
+         else
+            return false;
+      }
+   }
+
+   try
+   {
+      auto session = start_undo_session();
+      apply_block(new_block, skip);
+      session.push();
+   }
+   catch( const fc::exception& e )
+   {
+      elog("Failed to push new block:\n${e}", ("e", e.to_detail_string()));
+      _fork_db.remove(new_block.id());
+      throw;
+   }
+
+   return false;
+} FC_CAPTURE_AND_RETHROW() }
+
+/**
+ * Attempts to push the transaction into the pending queue
+ *
+ * When called to push a locally generated transaction, set the skip_block_size_check bit on the skip argument. This
+ * will allow the transaction to be pushed even if it causes the pending block size to exceed the maximum block size.
+ * Although the transaction will probably not propagate further now, as the peers are likely to have their pending
+ * queues full as well, it will be kept in the queue to be propagated later when a new block flushes out the pending
+ * queues.
+ */
+void database::push_transaction( const signed_transaction& trx, uint32_t skip )
+{
+   try
+   {
+      try
+      {
+         FC_ASSERT( fc::raw::pack_size(trx) <= (get_dynamic_global_properties().maximum_block_size - 256) );
+         set_producing( true );
+         detail::with_skip_flags( *this, skip,
+            [&]()
+            {
+               _push_transaction( trx );
+            });
+         set_producing( false );
+      }
+      catch( ... )
+      {
+         set_producing( false );
+         throw;
+      }
+   }
+   FC_CAPTURE_AND_RETHROW( (trx) )
+}
+
+void database::_push_transaction( const signed_transaction& trx )
+{
+   // If this is the first transaction pushed after applying a block, start a new undo session.
+   // This allows us to quickly rewind to the clean state of the head block, in case a new block arrives.
+   if( !_pending_tx_session.valid() )
+      _pending_tx_session = start_undo_session();
+
+   // Create a temporary undo session as a child of _pending_tx_session.
+   // The temporary session will be discarded by the destructor if
+   // _apply_transaction fails.  If we make it to merge(), we
+   // apply the changes.
+
+   auto temp_session = start_undo_session();
+   _apply_transaction( trx );
+   _pending_tx.push_back( trx );
+
+   notify_changed_objects();
+   // The transaction applied successfully. Merge its changes into the pending block session.
+   temp_session.squash();
+}
+
+signed_block database::generate_block(
+   fc::time_point_sec when,
+   const account_name_type& witness_owner,
+   const fc::ecc::private_key& block_signing_private_key,
+   uint32_t skip /* = 0 */
+   )
+{
+   signed_block result;
+   detail::with_skip_flags( *this, skip, [&]()
+   {
+      try
+      {
+         result = _generate_block( when, witness_owner, block_signing_private_key );
+      }
+      FC_CAPTURE_AND_RETHROW( (witness_owner) )
+   });
+   return result;
+}
+
+
+signed_block database::_generate_block(
+   fc::time_point_sec when,
+   const account_name_type& witness_owner,
+   const fc::ecc::private_key& block_signing_private_key
+   )
+{
+   uint32_t skip = get_node_properties().skip_flags;
+   uint32_t slot_num = get_slot_at_time( when );
+   FC_ASSERT( slot_num > 0 );
+   string scheduled_witness = get_scheduled_witness( slot_num );
+   FC_ASSERT( scheduled_witness == witness_owner );
+
+   const auto& witness_obj = get_witness( witness_owner );
+
+   if( !(skip & skip_witness_signature) )
+      FC_ASSERT( witness_obj.signing_key == block_signing_private_key.get_public_key() );
+
+   signed_block pending_block;
+
+   pending_block.previous = head_block_id();
+   pending_block.timestamp = when;
+   pending_block.witness = witness_owner;
+
+   const auto& witness = get_witness( witness_owner );
+
+   if( witness.running_version != ZATTERA_BLOCKCHAIN_VERSION )
+      pending_block.extensions.insert( block_header_extensions( ZATTERA_BLOCKCHAIN_VERSION ) );
+
+   const auto& hfp = get_hardfork_property_object();
+
+   if( hfp.current_hardfork_version < ZATTERA_BLOCKCHAIN_VERSION // Binary is newer hardfork than has been applied
+      && ( witness.hardfork_version_vote != _hardfork_versions[ hfp.last_hardfork + 1 ] || witness.hardfork_time_vote != _hardfork_times[ hfp.last_hardfork + 1 ] ) ) // Witness vote does not match binary configuration
+   {
+      // Make vote match binary configuration
+      pending_block.extensions.insert( block_header_extensions( hardfork_version_vote( _hardfork_versions[ hfp.last_hardfork + 1 ], _hardfork_times[ hfp.last_hardfork + 1 ] ) ) );
+   }
+   else if( hfp.current_hardfork_version == ZATTERA_BLOCKCHAIN_VERSION // Binary does not know of a new hardfork
+      && witness.hardfork_version_vote > ZATTERA_BLOCKCHAIN_VERSION ) // Voting for hardfork in the future, that we do not know of...
+   {
+      // Make vote match binary configuration. This is vote to not apply the new hardfork.
+      pending_block.extensions.insert( block_header_extensions( hardfork_version_vote( _hardfork_versions[ hfp.last_hardfork ], _hardfork_times[ hfp.last_hardfork ] ) ) );
+   }
+
+   // The 4 is for the max size of the transaction vector length
+   size_t total_block_size = fc::raw::pack_size( pending_block ) + 4;
+   auto maximum_block_size = get_dynamic_global_properties().maximum_block_size; //ZATTERA_MAX_BLOCK_SIZE;
+
+   //
+   // The following code throws away existing pending_tx_session and
+   // rebuilds it by re-applying pending transactions.
+   //
+   // This rebuild is necessary because pending transactions' validity
+   // and semantics may have changed since they were received, because
+   // time-based semantics are evaluated based on the current block
+   // time.  These changes can only be reflected in the database when
+   // the value of the "when" variable is known, which means we need to
+   // re-apply pending transactions in this method.
+   //
+   _pending_tx_session.reset();
+   _pending_tx_session = start_undo_session();
+
+   uint64_t postponed_tx_count = 0;
+   // pop pending state (reset to head block state)
+   for( const signed_transaction& tx : _pending_tx )
+   {
+      // Only include transactions that have not expired yet for currently generating block,
+      // this should clear problem transactions and allow block production to continue
+
+      if( tx.expiration < when )
+         continue;
+
+      uint64_t new_total_size = total_block_size + fc::raw::pack_size( tx );
+
+      // postpone transaction if it would make block too big
+      if( new_total_size >= maximum_block_size )
+      {
+         postponed_tx_count++;
+         continue;
+      }
+
+      try
+      {
+         auto temp_session = start_undo_session();
+         _apply_transaction( tx );
+         temp_session.squash();
+
+         total_block_size += fc::raw::pack_size( tx );
+         pending_block.transactions.push_back( tx );
+      }
+      catch ( const fc::exception& e )
+      {
+         // Do nothing, transaction will not be re-applied
+         //wlog( "Transaction was not processed while generating block due to ${e}", ("e", e) );
+         //wlog( "The transaction was ${t}", ("t", tx) );
+      }
+   }
+   if( postponed_tx_count > 0 )
+   {
+      wlog( "Postponed ${n} transactions due to block size limit", ("n", postponed_tx_count) );
+   }
+
+   _pending_tx_session.reset();
+
+   // We have temporarily broken the invariant that
+   // _pending_tx_session is the result of applying _pending_tx, as
+   // _pending_tx now consists of the set of postponed transactions.
+   // However, the push_block() call below will re-create the
+   // _pending_tx_session.
+
+   pending_block.transaction_merkle_root = pending_block.calculate_merkle_root();
+
+   if( !(skip & skip_witness_signature) )
+      pending_block.sign( block_signing_private_key );
+
+   // TODO:  Move this to _push_block() so session is restored.
+   if( !(skip & skip_block_size_check) )
+   {
+      FC_ASSERT( fc::raw::pack_size(pending_block) <= ZATTERA_MAX_BLOCK_SIZE );
+   }
+
+   push_block( pending_block, skip );
+
+   return pending_block;
+}
+
+/**
+ * Removes the most recent block from the database and
+ * undoes any changes it made.
+ */
+void database::pop_block()
+{
+   try
+   {
+      _pending_tx_session.reset();
+      auto head_id = head_block_id();
+
+      /// save the head block so we can recover its transactions
+      optional<signed_block> head_block = fetch_block_by_id( head_id );
+      ZATTERA_ASSERT( head_block.valid(), pop_empty_chain, "there are no blocks to pop" );
+
+      _fork_db.pop_block();
+      undo();
+
+      _popped_tx.insert( _popped_tx.begin(), head_block->transactions.begin(), head_block->transactions.end() );
+
+   }
+   FC_CAPTURE_AND_RETHROW()
+}
+
+void database::clear_pending()
+{
+   try
+   {
+      assert( (_pending_tx.size() == 0) || _pending_tx_session.valid() );
+      _pending_tx.clear();
+      _pending_tx_session.reset();
+   }
+   FC_CAPTURE_AND_RETHROW()
+}
+
+inline const void database::push_virtual_operation( const operation& op, bool force )
+{
+   /*
+   if( !force )
+   {
+      #if defined( IS_LOW_MEM ) && ! defined( IS_TEST_NET )
+      return;
+      #endif
+   }
+   */
+
+   FC_ASSERT( is_virtual_operation( op ) );
+   operation_notification note(op);
+   ++_current_virtual_op;
+   note.virtual_op = _current_virtual_op;
+   notify_pre_apply_operation( note );
+   notify_post_apply_operation( note );
+}
+
+void database::notify_pre_apply_operation( operation_notification& note )
+{
+   note.trx_id       = _current_trx_id;
+   note.block        = _current_block_num;
+   note.trx_in_block = _current_trx_in_block;
+   note.op_in_trx    = _current_op_in_trx;
+
+   ZATTERA_TRY_NOTIFY( _pre_apply_operation_signal, note )
+}
+
+void database::notify_post_apply_operation( const operation_notification& note )
+{
+   ZATTERA_TRY_NOTIFY( _post_apply_operation_signal, note )
+}
+
+void database::notify_pre_apply_block( const block_notification& note )
+{
+   ZATTERA_TRY_NOTIFY( _pre_apply_block_signal, note )
+}
+
+void database::notify_irreversible_block( uint32_t block_num )
+{
+   ZATTERA_TRY_NOTIFY( _on_irreversible_block, block_num )
+}
+
+void database::notify_post_apply_block( const block_notification& note )
+{
+   ZATTERA_TRY_NOTIFY( _post_apply_block_signal, note )
+}
+
+void database::notify_pre_apply_transaction( const transaction_notification& note )
+{
+   ZATTERA_TRY_NOTIFY( _pre_apply_transaction_signal, note )
+}
+
+void database::notify_post_apply_transaction( const transaction_notification& note )
+{
+   ZATTERA_TRY_NOTIFY( _post_apply_transaction_signal, note )
+}
+
+account_name_type database::get_scheduled_witness( uint32_t slot_num )const
+{
+   const dynamic_global_property_object& dpo = get_dynamic_global_properties();
+   const witness_schedule_object& wso = get_witness_schedule_object();
+   uint64_t current_aslot = dpo.current_aslot + slot_num;
+   return wso.current_shuffled_witnesses[ current_aslot % wso.num_scheduled_witnesses ];
+}
+
+fc::time_point_sec database::get_slot_time(uint32_t slot_num)const
+{
+   if( slot_num == 0 )
+      return fc::time_point_sec();
+
+   auto interval = ZATTERA_BLOCK_INTERVAL;
+   const dynamic_global_property_object& dpo = get_dynamic_global_properties();
+
+   if( head_block_num() == 0 )
+   {
+      // n.b. first block is at genesis_time plus one block interval
+      fc::time_point_sec genesis_time = dpo.time;
+      return genesis_time + slot_num * interval;
+   }
+
+   int64_t head_block_abs_slot = head_block_time().sec_since_epoch() / interval;
+   fc::time_point_sec head_slot_time( head_block_abs_slot * interval );
+
+   // "slot 0" is head_slot_time
+   // "slot 1" is head_slot_time,
+   //   plus maint interval if head block is a maint block
+   //   plus block interval if head block is not a maint block
+   return head_slot_time + (slot_num * interval);
+}
+
+uint32_t database::get_slot_at_time(fc::time_point_sec when)const
+{
+   fc::time_point_sec first_slot_time = get_slot_time( 1 );
+   if( when < first_slot_time )
+      return 0;
+   return (when - first_slot_time).to_seconds() / ZATTERA_BLOCK_INTERVAL + 1;
+}
+
+/**
+ *  Converts ZTR into ZBD and adds it to to_account while reducing the ZTR supply
+ *  by ZTR and increasing the ZBD supply by the specified amount.
+ */
+std::pair< asset, asset > database::create_zbd( const account_object& to_account, asset ztr, bool to_reward_balance )
+{
+   std::pair< asset, asset > assets( asset( 0, ZBD_SYMBOL ), asset( 0, ZTR_SYMBOL ) );
+
+   try
+   {
+      if( ztr.amount == 0 )
+         return assets;
+
+      const auto& median_price = get_feed_history().current_median_history;
+      const auto& gpo = get_dynamic_global_properties();
+
+      if( !median_price.is_null() )
+      {
+         auto to_zbd = ( gpo.zbd_print_rate * ztr.amount ) / ZATTERA_100_PERCENT;
+         auto to_ztr = ztr.amount - to_zbd;
+
+         auto zbd = asset( to_zbd, ZTR_SYMBOL ) * median_price;
+
+         if( to_reward_balance )
+         {
+            adjust_reward_balance( to_account, zbd );
+            adjust_reward_balance( to_account, asset( to_ztr, ZTR_SYMBOL ) );
+         }
+         else
+         {
+            adjust_balance( to_account, zbd );
+            adjust_balance( to_account, asset( to_ztr, ZTR_SYMBOL ) );
+         }
+
+         adjust_supply( asset( -to_zbd, ZTR_SYMBOL ) );
+         adjust_supply( zbd );
+         assets.first = zbd;
+         assets.second = asset( to_ztr, ZTR_SYMBOL );
+      }
+      else
+      {
+         adjust_balance( to_account, ztr );
+         assets.second = ztr;
+      }
+   }
+   FC_CAPTURE_LOG_AND_RETHROW( (to_account.name)(ztr) )
+
+   return assets;
+}
+
+/**
+ * @param to_account - the account to receive the new vesting shares
+ * @param liquid     - ZTR to be converted to vesting shares
+ */
+asset database::create_vesting( const account_object& to_account, asset liquid, bool to_reward_balance )
+{
+   try
+   {
+      auto calculate_new_vesting = [ liquid ] ( price vesting_share_price ) -> asset
+         {
+         /**
+          *  The ratio of total_vesting_shares / total_vesting_fund_ztr should not
+          *  change as the result of the user adding funds
+          *
+          *  V / C  = (V+Vn) / (C+Cn)
+          *
+          *  Simplifies to Vn = (V * Cn ) / C
+          *
+          *  If Cn equals o.amount, then we must solve for Vn to know how many new vesting shares
+          *  the user should receive.
+          *
+          *  128 bit math is requred due to multiplying of 64 bit numbers. This is done in asset and price.
+          */
+         asset new_vesting = liquid * ( vesting_share_price );
+         return new_vesting;
+         };
+
+      FC_ASSERT( liquid.symbol == ZTR_SYMBOL );
+      // ^ A novelty, needed but risky in case someone managed to slip ZBD/TESTS here in blockchain history.
+      // Get share price.
+      const auto& cprops = get_dynamic_global_properties();
+      price vesting_share_price = to_reward_balance ? cprops.get_reward_vesting_share_price() : cprops.get_vesting_share_price();
+      // Calculate new vesting from provided liquid using share price.
+      asset new_vesting = calculate_new_vesting( vesting_share_price );
+      // Add new vesting to owner's balance.
+      if( to_reward_balance )
+         adjust_reward_balance( to_account, liquid, new_vesting );
+      else
+         adjust_balance( to_account, new_vesting );
+      // Update global vesting pool numbers.
+      modify( cprops, [&]( dynamic_global_property_object& props )
+      {
+         if( to_reward_balance )
+         {
+            props.pending_rewarded_vesting_shares += new_vesting;
+            props.pending_rewarded_vesting_ztr += liquid;
+         }
+         else
+         {
+            props.total_vesting_fund_ztr += liquid;
+            props.total_vesting_shares += new_vesting;
+         }
+      } );
+      // Update witness voting numbers.
+      if( !to_reward_balance )
+         adjust_proxied_witness_votes( to_account, new_vesting.amount );
+
+      return new_vesting;
+   }
+   FC_CAPTURE_AND_RETHROW( (to_account.name)(liquid) )
+}
+
+void database::adjust_proxied_witness_votes( const account_object& a,
+                                   const std::array< share_type, ZATTERA_MAX_PROXY_RECURSION_DEPTH+1 >& delta,
+                                   int depth )
+{
+   if( a.proxy != ZATTERA_PROXY_TO_SELF_ACCOUNT )
+   {
+      /// nested proxies are not supported, vote will not propagate
+      if( depth >= ZATTERA_MAX_PROXY_RECURSION_DEPTH )
+         return;
+
+      const auto& proxy = get_account( a.proxy );
+
+      modify( proxy, [&]( account_object& a )
+      {
+         for( int i = ZATTERA_MAX_PROXY_RECURSION_DEPTH - depth - 1; i >= 0; --i )
+         {
+            a.proxied_vsf_votes[i+depth] += delta[i];
+         }
+      } );
+
+      adjust_proxied_witness_votes( proxy, delta, depth + 1 );
+   }
+   else
+   {
+      share_type total_delta = 0;
+      for( int i = ZATTERA_MAX_PROXY_RECURSION_DEPTH - depth; i >= 0; --i )
+         total_delta += delta[i];
+      adjust_witness_votes( a, total_delta );
+   }
+}
+
+void database::adjust_proxied_witness_votes( const account_object& a, share_type delta, int depth )
+{
+   if( a.proxy != ZATTERA_PROXY_TO_SELF_ACCOUNT )
+   {
+      /// nested proxies are not supported, vote will not propagate
+      if( depth >= ZATTERA_MAX_PROXY_RECURSION_DEPTH )
+         return;
+
+      const auto& proxy = get_account( a.proxy );
+
+      modify( proxy, [&]( account_object& a )
+      {
+         a.proxied_vsf_votes[depth] += delta;
+      } );
+
+      adjust_proxied_witness_votes( proxy, delta, depth + 1 );
+   }
+   else
+   {
+     adjust_witness_votes( a, delta );
+   }
+}
+
+void database::adjust_witness_votes( const account_object& a, share_type delta )
+{
+   const auto& vidx = get_index< witness_vote_index >().indices().get< by_account_witness >();
+   auto itr = vidx.lower_bound( boost::make_tuple( a.name, account_name_type() ) );
+   while( itr != vidx.end() && itr->account == a.name )
+   {
+      adjust_witness_vote( get< witness_object, by_name >(itr->witness), delta );
+      ++itr;
+   }
+}
+
+void database::adjust_witness_vote( const witness_object& witness, share_type delta )
+{
+   const witness_schedule_object& wso = get_witness_schedule_object();
+   modify( witness, [&]( witness_object& w )
+   {
+      auto delta_pos = w.votes.value * (wso.current_virtual_time - w.virtual_last_update);
+      w.virtual_position += delta_pos;
+
+      w.virtual_last_update = wso.current_virtual_time;
+      w.votes += delta;
+      FC_ASSERT( w.votes <= get_dynamic_global_properties().total_vesting_shares.amount, "", ("w.votes", w.votes)("props",get_dynamic_global_properties().total_vesting_shares) );
+
+      w.virtual_scheduled_time = w.virtual_last_update + (ZATTERA_VIRTUAL_SCHEDULE_LAP_LENGTH2 - w.virtual_position)/(w.votes.value+1);
+
+      /** witnesses with a low number of votes could overflow the time field and end up with a scheduled time in the past */
+      if( w.virtual_scheduled_time < wso.current_virtual_time )
+         w.virtual_scheduled_time = fc::uint128::max_value();
+   } );
+}
+
+void database::clear_witness_votes( const account_object& a )
+{
+   const auto& vidx = get_index< witness_vote_index >().indices().get<by_account_witness>();
+   auto itr = vidx.lower_bound( boost::make_tuple( a.name, account_name_type() ) );
+   while( itr != vidx.end() && itr->account == a.name )
+   {
+      const auto& current = *itr;
+      ++itr;
+      remove(current);
+   }
+
+   modify( a, [&](account_object& acc )
+   {
+      acc.witnesses_voted_for = 0;
+   });
+}
+
+void database::clear_null_account_balance()
+{
+   const auto& null_account = get_account( ZATTERA_NULL_ACCOUNT );
+   asset total_ztr( 0, ZTR_SYMBOL );
+   asset total_zbd( 0, ZBD_SYMBOL );
+
+   if( null_account.balance.amount > 0 )
+   {
+      total_ztr += null_account.balance;
+      adjust_balance( null_account, -null_account.balance );
+   }
+
+   if( null_account.savings_balance.amount > 0 )
+   {
+      total_ztr += null_account.savings_balance;
+      adjust_savings_balance( null_account, -null_account.savings_balance );
+   }
+
+   if( null_account.zbd_balance.amount > 0 )
+   {
+      total_zbd += null_account.zbd_balance;
+      adjust_balance( null_account, -null_account.zbd_balance );
+   }
+
+   if( null_account.savings_zbd_balance.amount > 0 )
+   {
+      total_zbd += null_account.savings_zbd_balance;
+      adjust_savings_balance( null_account, -null_account.savings_zbd_balance );
+   }
+
+   if( null_account.vesting_shares.amount > 0 )
+   {
+      const auto& gpo = get_dynamic_global_properties();
+      auto converted_ztr = null_account.vesting_shares * gpo.get_vesting_share_price();
+
+      modify( gpo, [&]( dynamic_global_property_object& g )
+      {
+         g.total_vesting_shares -= null_account.vesting_shares;
+         g.total_vesting_fund_ztr -= converted_ztr;
+      });
+
+      modify( null_account, [&]( account_object& a )
+      {
+         a.vesting_shares.amount = 0;
+      });
+
+      total_ztr += converted_ztr;
+   }
+
+   if( null_account.reward_ztr_balance.amount > 0 )
+   {
+      total_ztr += null_account.reward_ztr_balance;
+      adjust_reward_balance( null_account, -null_account.reward_ztr_balance );
+   }
+
+   if( null_account.reward_zbd_balance.amount > 0 )
+   {
+      total_zbd += null_account.reward_zbd_balance;
+      adjust_reward_balance( null_account, -null_account.reward_zbd_balance );
+   }
+
+   if( null_account.reward_vesting_balance.amount > 0 )
+   {
+      const auto& gpo = get_dynamic_global_properties();
+
+      total_ztr += null_account.reward_vesting_ztr;
+
+      modify( gpo, [&]( dynamic_global_property_object& g )
+      {
+         g.pending_rewarded_vesting_shares -= null_account.reward_vesting_balance;
+         g.pending_rewarded_vesting_ztr -= null_account.reward_vesting_ztr;
+      });
+
+      modify( null_account, [&]( account_object& a )
+      {
+         a.reward_vesting_ztr.amount = 0;
+         a.reward_vesting_balance.amount = 0;
+      });
+   }
+
+   if( total_ztr.amount > 0 )
+      adjust_supply( -total_ztr );
+
+   if( total_zbd.amount > 0 )
+      adjust_supply( -total_zbd );
+}
+
+/**
+ * This method updates total_reward_shares2 on DGPO, and children_rshares2 on comments, when a comment's rshares2 changes
+ * from old_rshares2 to new_rshares2.  Maintaining invariants that children_rshares2 is the sum of all descendants' rshares2,
+ * and dgpo.total_reward_shares2 is the total number of rshares2 outstanding.
+ */
+void database::adjust_rshares2( const comment_object& c, fc::uint128_t old_rshares2, fc::uint128_t new_rshares2 )
+{
+
+   const auto& dgpo = get_dynamic_global_properties();
+   modify( dgpo, [&]( dynamic_global_property_object& p )
+   {
+      p.total_reward_shares2 -= old_rshares2;
+      p.total_reward_shares2 += new_rshares2;
+   } );
+}
+
+void database::update_owner_authority( const account_object& account, const authority& owner_authority )
+{
+   if( head_block_num() >= ZATTERA_OWNER_AUTH_HISTORY_TRACKING_START_BLOCK_NUM )
+   {
+      create< owner_authority_history_object >( [&]( owner_authority_history_object& hist )
+      {
+         hist.account = account.name;
+         hist.previous_owner_authority = get< account_authority_object, by_account >( account.name ).owner;
+         hist.last_valid_time = head_block_time();
+      });
+   }
+
+   modify( get< account_authority_object, by_account >( account.name ), [&]( account_authority_object& auth )
+   {
+      auth.owner = owner_authority;
+      auth.last_owner_update = head_block_time();
+   });
+}
+
+void database::process_vesting_withdrawals()
+{
+   const auto& widx = get_index< account_index, by_next_vesting_withdrawal >();
+   const auto& didx = get_index< withdraw_vesting_route_index, by_withdraw_route >();
+   auto current = widx.begin();
+
+   const auto& cprops = get_dynamic_global_properties();
+
+   while( current != widx.end() && current->next_vesting_withdrawal <= head_block_time() )
+   {
+      const auto& from_account = *current; ++current;
+
+      /**
+      *  Let T = total tokens in vesting fund
+      *  Let V = total vesting shares
+      *  Let v = total vesting shares being cashed out
+      *
+      *  The user may withdraw  vT / V tokens
+      */
+      share_type to_withdraw;
+      if ( from_account.to_withdraw - from_account.withdrawn < from_account.vesting_withdraw_rate.amount )
+         to_withdraw = std::min( from_account.vesting_shares.amount, from_account.to_withdraw % from_account.vesting_withdraw_rate.amount ).value;
+      else
+         to_withdraw = std::min( from_account.vesting_shares.amount, from_account.vesting_withdraw_rate.amount ).value;
+
+      share_type vests_deposited_as_ztr = 0;
+      share_type vests_deposited_as_vests = 0;
+      asset total_ztr_converted = asset( 0, ZTR_SYMBOL );
+
+      // Do two passes, the first for vests, the second for ztr. Try to maintain as much accuracy for vests as possible.
+      for( auto itr = didx.upper_bound( boost::make_tuple( from_account.name, account_name_type() ) );
+           itr != didx.end() && itr->from_account == from_account.name;
+           ++itr )
+      {
+         if( itr->auto_vest )
+         {
+            share_type to_deposit = ( ( fc::uint128_t ( to_withdraw.value ) * itr->percent ) / ZATTERA_100_PERCENT ).to_uint64();
+            vests_deposited_as_vests += to_deposit;
+
+            if( to_deposit > 0 )
+            {
+               const auto& to_account = get< account_object, by_name >( itr->to_account );
+
+               modify( to_account, [&]( account_object& a )
+               {
+                  a.vesting_shares.amount += to_deposit;
+               });
+
+               adjust_proxied_witness_votes( to_account, to_deposit );
+
+               push_virtual_operation( fill_vesting_withdraw_operation( from_account.name, to_account.name, asset( to_deposit, VESTS_SYMBOL ), asset( to_deposit, VESTS_SYMBOL ) ) );
+            }
+         }
+      }
+
+      for( auto itr = didx.upper_bound( boost::make_tuple( from_account.name, account_name_type() ) );
+           itr != didx.end() && itr->from_account == from_account.name;
+           ++itr )
+      {
+         if( !itr->auto_vest )
+         {
+            const auto& to_account = get< account_object, by_name >( itr->to_account );
+
+            share_type to_deposit = ( ( fc::uint128_t ( to_withdraw.value ) * itr->percent ) / ZATTERA_100_PERCENT ).to_uint64();
+            vests_deposited_as_ztr += to_deposit;
+            auto converted_ztr = asset( to_deposit, VESTS_SYMBOL ) * cprops.get_vesting_share_price();
+            total_ztr_converted += converted_ztr;
+
+            if( to_deposit > 0 )
+            {
+               modify( to_account, [&]( account_object& a )
+               {
+                  a.balance += converted_ztr;
+               });
+
+               modify( cprops, [&]( dynamic_global_property_object& o )
+               {
+                  o.total_vesting_fund_ztr -= converted_ztr;
+                  o.total_vesting_shares.amount -= to_deposit;
+               });
+
+               push_virtual_operation( fill_vesting_withdraw_operation( from_account.name, to_account.name, asset( to_deposit, VESTS_SYMBOL), converted_ztr ) );
+            }
+         }
+      }
+
+      share_type to_convert = to_withdraw - vests_deposited_as_ztr - vests_deposited_as_vests;
+      FC_ASSERT( to_convert >= 0, "Deposited more vests than were supposed to be withdrawn" );
+
+      auto converted_ztr = asset( to_convert, VESTS_SYMBOL ) * cprops.get_vesting_share_price();
+
+      modify( from_account, [&]( account_object& a )
+      {
+         a.vesting_shares.amount -= to_withdraw;
+         a.balance += converted_ztr;
+         a.withdrawn += to_withdraw;
+
+         if( a.withdrawn >= a.to_withdraw || a.vesting_shares.amount == 0 )
+         {
+            a.vesting_withdraw_rate.amount = 0;
+            a.next_vesting_withdrawal = fc::time_point_sec::maximum();
+         }
+         else
+         {
+            a.next_vesting_withdrawal += fc::seconds( ZATTERA_VESTING_WITHDRAW_INTERVAL_SECONDS );
+         }
+      });
+
+      modify( cprops, [&]( dynamic_global_property_object& o )
+      {
+         o.total_vesting_fund_ztr -= converted_ztr;
+         o.total_vesting_shares.amount -= to_convert;
+      });
+
+      if( to_withdraw > 0 )
+         adjust_proxied_witness_votes( from_account, -to_withdraw );
+
+      push_virtual_operation( fill_vesting_withdraw_operation( from_account.name, from_account.name, asset( to_convert, VESTS_SYMBOL ), converted_ztr ) );
+   }
+}
+
+void database::adjust_total_payout( const comment_object& cur, const asset& zbd_created, const asset& curator_zbd_value, const asset& beneficiary_value )
+{
+   modify( cur, [&]( comment_object& c )
+   {
+      // input assets should be in zbd
+      c.total_payout_value += zbd_created;
+      c.curator_payout_value += curator_zbd_value;
+      c.beneficiary_payout_value += beneficiary_value;
+   } );
+   /// TODO: potentially modify author's total payout numbers as well
+}
+
+/**
+ *  This method will iterate through all comment_vote_objects and give them
+ *  (max_rewards * weight) / c.total_vote_weight.
+ *
+ *  @returns unclaimed rewards.
+ */
+share_type database::pay_curators( const comment_object& c, share_type& max_rewards )
+{
+   struct cmp
+   {
+      bool operator()( const comment_vote_object* obj, const comment_vote_object* obj2 ) const
+      {
+         if( obj->weight == obj2->weight )
+            return obj->voter < obj2->voter;
+         else
+            return obj->weight > obj2->weight;
+      }
+   };
+
+   try
+   {
+      uint128_t total_weight( c.total_vote_weight );
+      //edump( (total_weight)(max_rewards) );
+      share_type unclaimed_rewards = max_rewards;
+
+      if( !c.allow_curation_rewards )
+      {
+         unclaimed_rewards = 0;
+         max_rewards = 0;
+      }
+      else if( c.total_vote_weight > 0 )
+      {
+         const auto& cvidx = get_index<comment_vote_index>().indices().get<by_comment_voter>();
+         auto itr = cvidx.lower_bound( c.id );
+
+         std::set< const comment_vote_object*, cmp > proxy_set;
+         while( itr != cvidx.end() && itr->comment == c.id )
+         {
+            proxy_set.insert( &( *itr ) );
+            ++itr;
+         }
+
+         for( auto& item : proxy_set )
+         {
+            uint128_t weight( item->weight );
+            auto claim = ( ( max_rewards.value * weight ) / total_weight ).to_uint64();
+            if( claim > 0 ) // min_amt is non-zero satoshis
+            {
+               unclaimed_rewards -= claim;
+               const auto& voter = get( item->voter );
+               auto reward = create_vesting( voter, asset( claim, ZTR_SYMBOL ), true );
+
+               push_virtual_operation( curation_reward_operation( voter.name, reward, c.author, to_string( c.permlink ) ) );
+
+               #ifndef IS_LOW_MEM
+                  modify( voter, [&]( account_object& a )
+                  {
+                     a.curation_rewards += claim;
+                  });
+               #endif
+            }
+         }
+      }
+      max_rewards -= unclaimed_rewards;
+
+      return unclaimed_rewards;
+   } FC_CAPTURE_AND_RETHROW()
+}
+
+void fill_comment_reward_context_local_state( util::comment_reward_context& ctx, const comment_object& comment )
+{
+   ctx.rshares = comment.net_rshares;
+   ctx.reward_weight = comment.reward_weight;
+   ctx.max_zbd = comment.max_accepted_payout;
+}
+
+share_type database::cashout_comment_helper( util::comment_reward_context& ctx, const comment_object& comment, bool forward_curation_remainder )
+{
+   try
+   {
+      share_type claimed_reward = 0;
+
+      if( comment.net_rshares > 0 )
+      {
+         fill_comment_reward_context_local_state( ctx, comment );
+
+         const auto rf = get_reward_fund( comment );
+         ctx.reward_curve = rf.author_reward_curve;
+         ctx.content_constant = rf.content_constant;
+
+         const share_type reward = util::get_rshare_reward( ctx );
+         uint128_t reward_tokens = uint128_t( reward.value );
+
+         if( reward_tokens > 0 )
+         {
+            share_type curation_tokens = ( ( reward_tokens * get_curation_rewards_percent( comment ) ) / ZATTERA_100_PERCENT ).to_uint64();
+            share_type author_tokens = reward_tokens.to_uint64() - curation_tokens;
+
+            share_type curation_remainder = pay_curators( comment, curation_tokens );
+
+            if( forward_curation_remainder )
+               author_tokens += curation_remainder;
+
+            share_type total_beneficiary = 0;
+            claimed_reward = author_tokens + curation_tokens;
+
+            for( auto& b : comment.beneficiaries )
+            {
+               auto benefactor_tokens = ( author_tokens * b.weight ) / ZATTERA_100_PERCENT;
+               auto vest_created = create_vesting( get_account( b.account ), asset( benefactor_tokens, ZTR_SYMBOL ), true );
+               push_virtual_operation( comment_benefactor_reward_operation( b.account, comment.author, to_string( comment.permlink ), vest_created ) );
+               total_beneficiary += benefactor_tokens;
+            }
+
+            author_tokens -= total_beneficiary;
+
+            auto zbd_amount  = ( author_tokens * comment.percent_zattera_dollars ) / ( 2 * ZATTERA_100_PERCENT ) ;
+            auto vesting_ztr = author_tokens - zbd_amount;
+
+            const auto& author = get_account( comment.author );
+            auto vest_created = create_vesting( author, asset( vesting_ztr, ZTR_SYMBOL ), true );
+            auto zbd_payout = create_zbd( author, asset( zbd_amount, ZTR_SYMBOL ), true );
+
+            adjust_total_payout( comment, zbd_payout.first + to_zbd( zbd_payout.second + asset( vesting_ztr, ZTR_SYMBOL ) ), to_zbd( asset( curation_tokens, ZTR_SYMBOL ) ), to_zbd( asset( total_beneficiary, ZTR_SYMBOL ) ) );
+
+            push_virtual_operation( author_reward_operation( comment.author, to_string( comment.permlink ), zbd_payout.first, zbd_payout.second, vest_created ) );
+            push_virtual_operation( comment_reward_operation( comment.author, to_string( comment.permlink ), to_zbd( asset( claimed_reward, ZTR_SYMBOL ) ) ) );
+
+            #ifndef IS_LOW_MEM
+               modify( comment, [&]( comment_object& c )
+               {
+                  c.author_rewards += author_tokens;
+               });
+
+               modify( get_account( comment.author ), [&]( account_object& a )
+               {
+                  a.posting_rewards += author_tokens;
+               });
+            #endif
+
+         }
+      }
+
+      modify( comment, [&]( comment_object& c )
+      {
+         /**
+         * A payout is only made for positive rshares, negative rshares hang around
+         * for the next time this post might get an upvote.
+         */
+         if( c.net_rshares > 0 )
+            c.net_rshares = 0;
+         c.children_abs_rshares = 0;
+         c.abs_rshares  = 0;
+         c.vote_rshares = 0;
+         c.total_vote_weight = 0;
+         c.max_cashout_time = fc::time_point_sec::maximum();
+
+         c.cashout_time = fc::time_point_sec::maximum();
+
+         c.last_payout = head_block_time();
+      } );
+
+      push_virtual_operation( comment_payout_update_operation( comment.author, to_string( comment.permlink ) ) );
+
+      const auto& vote_idx = get_index< comment_vote_index >().indices().get< by_comment_voter >();
+      auto vote_itr = vote_idx.lower_bound( comment.id );
+      while( vote_itr != vote_idx.end() && vote_itr->comment == comment.id )
+      {
+         const auto& cur_vote = *vote_itr;
+         ++vote_itr;
+         if( calculate_discussion_payout_time( comment ) != fc::time_point_sec::maximum() )
+         {
+            modify( cur_vote, [&]( comment_vote_object& cvo )
+            {
+               cvo.num_changes = -1;
+            });
+         }
+         else
+         {
+#ifdef CLEAR_VOTES
+            remove( cur_vote );
+#endif
+         }
+      }
+
+      return claimed_reward;
+   } FC_CAPTURE_AND_RETHROW( (comment) )
+}
+
+void database::process_comment_cashout()
+{
+   util::comment_reward_context ctx;
+   ctx.current_ztr_price = get_feed_history().current_median_history;
+
+   vector< reward_fund_context > funds;
+   vector< share_type > ztr_awarded;
+   const auto& reward_idx = get_index< reward_fund_index, by_id >();
+
+   // Decay recent rshares of each fund
+   for( auto itr = reward_idx.begin(); itr != reward_idx.end(); ++itr )
+   {
+      // Add all reward funds to the local cache and decay their recent rshares
+      modify( *itr, [&]( reward_fund_object& rfo )
+      {
+         fc::microseconds decay_time = ZATTERA_RECENT_RSHARES_DECAY_TIME;
+
+         rfo.recent_claims -= ( rfo.recent_claims * ( head_block_time() - rfo.last_update ).to_seconds() ) / decay_time.to_seconds();
+         rfo.last_update = head_block_time();
+      });
+
+      reward_fund_context rf_ctx;
+      rf_ctx.recent_claims = itr->recent_claims;
+      rf_ctx.reward_balance = itr->reward_balance;
+
+      // The index is by ID, so the ID should be the current size of the vector (0, 1, 2, etc...)
+      assert( funds.size() == static_cast<size_t>(itr->id._id) );
+
+      funds.push_back( rf_ctx );
+   }
+
+   const auto& cidx = get_index< comment_index >().indices().get< by_cashout_time >();
+
+   auto current = cidx.begin();
+   //  add all rshares about to be cashed out to the reward funds. This ensures equal satoshi per rshare payment
+   while( current != cidx.end() && current->cashout_time <= head_block_time() )
+   {
+      if( current->net_rshares > 0 )
+      {
+         const auto& rf = get_reward_fund( *current );
+         funds[ rf.id._id ].recent_claims += util::evaluate_reward_curve( current->net_rshares.value, rf.author_reward_curve, rf.content_constant );
+      }
+
+      ++current;
+   }
+
+   current = cidx.begin();
+
+   /*
+    * Payout all comments
+    *
+    * Each payout follows a similar pattern, but for a different reason.
+    * Cashout comment helper does not know about the reward fund it is paying from.
+    * The helper only does token allocation based on curation rewards and the ZBD
+    * global %, etc.
+    *
+    * Each context is used by get_rshare_reward to determine what part of each budget
+    * the comment is entitled to. Prior to hardfork 17, all payouts are done against
+    * the global state updated each payout. After the hardfork, each payout is done
+    * against a reward fund state that is snapshotted before all payouts in the block.
+    */
+   while( current != cidx.end() && current->cashout_time <= head_block_time() )
+   {
+      auto fund_id = get_reward_fund( *current ).id._id;
+      ctx.total_reward_shares2 = funds[ fund_id ].recent_claims;
+      ctx.total_reward_fund_ztr = funds[ fund_id ].reward_balance;
+
+      bool forward_curation_remainder = false;
+
+      funds[ fund_id ].ztr_awarded += cashout_comment_helper( ctx, *current, forward_curation_remainder );
+
+      current = cidx.begin();
+   }
+
+   // Write the cached fund state back to the database
+   if( funds.size() )
+   {
+      for( size_t i = 0; i < funds.size(); i++ )
+      {
+         modify( get< reward_fund_object, by_id >( reward_fund_id_type( i ) ), [&]( reward_fund_object& rfo )
+         {
+            rfo.recent_claims = funds[ i ].recent_claims;
+            rfo.reward_balance -= asset( funds[ i ].ztr_awarded, ZTR_SYMBOL );
+         });
+      }
+   }
+}
+
+/**
+ *  This method implements a two-phase inflation model:
+ *
+ *  Bootstrap Phase (until supply reaches ZATTERA_BOOTSTRAP_SUPPLY_THRESHOLD):
+ *    - Fixed block reward of ZATTERA_BOOTSTRAP_FIXED_BLOCK_REWARD per block
+ *    - Ensures predictable initial supply growth during chain launch
+ *
+ *  Normal Inflation Phase (after bootstrap threshold):
+ *    - Starts at 9.78% annual inflation, decreasing to 0.95% over ~20.5 years
+ *    - Rate decreases by 0.01% every 250k blocks
+ *
+ *  Reward distribution (both phases):
+ *    - 75% to content creators (subject to reward fund allocation)
+ *    - 15% to vesting fund (VESTS holders)
+ *    - 10% to block producers (witnesses)
+ *
+ *  Note: Vesting rewards only distributed when total_vesting_shares >= ZATTERA_MIN_REWARD_VESTING_SHARES
+ *        to prevent VESTS price volatility during initial bootstrap
+ */
+void database::process_funds()
+{
+   const auto& props = get_dynamic_global_properties();
+   const auto& wso = get_witness_schedule_object();
+
+   bool is_bootstrap_phase = props.current_supply.amount < ZATTERA_BOOTSTRAP_SUPPLY_THRESHOLD;
+   share_type new_ztr = 0;
+
+   if( is_bootstrap_phase )
+   {
+      // Bootstrap Phase: Fixed block reward
+      new_ztr = ZATTERA_BOOTSTRAP_FIXED_BLOCK_REWARD;
+   }
+   else
+   {
+      // Normal Inflation Phase: Supply-proportional rewards
+      /**
+       * Starts at 9.78% instantaneous inflation rate (978 basis points), decreasing to 0.95% at a rate of 0.01%
+       * every 250k blocks. This narrowing will take approximately 20.5 years and will complete on block 220,750,000
+       */
+      int64_t start_inflation_rate = int64_t( ZATTERA_INFLATION_RATE_START_PERCENT );
+      int64_t inflation_rate_adjustment = int64_t( head_block_num() / ZATTERA_INFLATION_NARROWING_PERIOD );
+      int64_t inflation_rate_floor = int64_t( ZATTERA_INFLATION_RATE_STOP_PERCENT );
+
+      // below subtraction cannot underflow int64_t because inflation_rate_adjustment is <2^32
+      int64_t current_inflation_rate = std::max( start_inflation_rate - inflation_rate_adjustment, inflation_rate_floor );
+
+      new_ztr = ( props.virtual_supply.amount * current_inflation_rate ) / ( int64_t( ZATTERA_100_PERCENT ) * int64_t( ZATTERA_BLOCKS_PER_YEAR ) );
+   }
+
+   auto content_reward = ( new_ztr * ZATTERA_CONTENT_REWARD_PERCENT ) / ZATTERA_100_PERCENT;
+   content_reward = pay_reward_funds( content_reward ); /// 75% to content creator
+   auto vesting_reward = ( new_ztr * ZATTERA_VESTING_FUND_PERCENT ) / ZATTERA_100_PERCENT; /// 15% to vesting fund
+
+   // Only distribute vesting rewards when total_vesting_shares reaches minimum threshold
+   // This prevents VESTS price volatility during initial chain bootstrap
+   if( props.total_vesting_shares.amount < ZATTERA_MIN_REWARD_VESTING_SHARES )
+   {
+      vesting_reward = 0;
+   }
+
+   auto witness_reward = new_ztr - content_reward - vesting_reward; /// Remaining 10% to witness pay
+
+   const auto& cwit = get_witness( props.current_witness );
+
+   // Apply witness pay weighting only after bootstrap phase
+   if( !is_bootstrap_phase )
+   {
+      witness_reward *= ZATTERA_MAX_WITNESSES;
+
+      if( cwit.schedule == witness_object::timeshare )
+         witness_reward *= wso.timeshare_weight;
+      else if( cwit.schedule == witness_object::top20 )
+         witness_reward *= wso.top20_weight;
+      else
+         wlog( "Encountered unknown witness type for witness: ${w}", ("w", cwit.owner) );
+
+      witness_reward /= wso.witness_pay_normalization_factor;
+   }
+
+   new_ztr = content_reward + vesting_reward + witness_reward;
+
+   modify( props, [&]( dynamic_global_property_object& p )
+   {
+      p.total_vesting_fund_ztr += asset( vesting_reward, ZTR_SYMBOL );
+      p.current_supply           += asset( new_ztr, ZTR_SYMBOL );
+      p.virtual_supply           += asset( new_ztr, ZTR_SYMBOL );
+   });
+
+   const auto& producer_reward = create_vesting( get_account( cwit.owner ), asset( witness_reward, ZTR_SYMBOL ) );
+   push_virtual_operation( producer_reward_operation( cwit.owner, producer_reward ) );
+}
+
+void database::process_savings_withdraws()
+{
+  const auto& idx = get_index< savings_withdraw_index >().indices().get< by_complete_from_rid >();
+  auto itr = idx.begin();
+  while( itr != idx.end() ) {
+     if( itr->complete > head_block_time() )
+        break;
+     adjust_balance( get_account( itr->to ), itr->amount );
+
+     modify( get_account( itr->from ), [&]( account_object& a )
+     {
+        a.savings_withdraw_requests--;
+     });
+
+     push_virtual_operation( fill_transfer_from_savings_operation( itr->from, itr->to, itr->amount, itr->request_id, to_string( itr->memo) ) );
+
+     remove( *itr );
+     itr = idx.begin();
+  }
+}
+
+uint16_t database::get_curation_rewards_percent( const comment_object& c ) const
+{
+   return get_reward_fund( c ).percent_curation_rewards;
+}
+
+share_type database::pay_reward_funds( share_type reward )
+{
+   const auto& reward_idx = get_index< reward_fund_index, by_id >();
+   share_type used_rewards = 0;
+
+   for( auto itr = reward_idx.begin(); itr != reward_idx.end(); ++itr )
+   {
+      // reward is a per block reward and the percents are 16-bit. This should never overflow
+      auto r = ( reward * itr->percent_content_rewards ) / ZATTERA_100_PERCENT;
+
+      modify( *itr, [&]( reward_fund_object& rfo )
+      {
+         rfo.reward_balance += asset( r, ZTR_SYMBOL );
+      });
+
+      used_rewards += r;
+
+      // Sanity check to ensure we aren't printing more ZTR than has been allocated through inflation
+      FC_ASSERT( used_rewards <= reward );
+   }
+
+   return used_rewards;
+}
+
+/**
+ *  Iterates over all conversion requests with a conversion date before
+ *  the head block time and then converts them to/from ztr/zbd at the
+ *  current median price feed history price times the premium
+ */
+void database::process_conversions()
+{
+   auto now = head_block_time();
+   const auto& request_by_date = get_index< convert_request_index >().indices().get< by_conversion_date >();
+   auto itr = request_by_date.begin();
+
+   const auto& fhistory = get_feed_history();
+   if( fhistory.current_median_history.is_null() )
+      return;
+
+   asset net_zbd( 0, ZBD_SYMBOL );
+   asset net_ztr( 0, ZTR_SYMBOL );
+
+   while( itr != request_by_date.end() && itr->conversion_date <= now )
+   {
+      auto amount_to_issue = itr->amount * fhistory.current_median_history;
+
+      adjust_balance( itr->owner, amount_to_issue );
+
+      net_zbd   += itr->amount;
+      net_ztr += amount_to_issue;
+
+      push_virtual_operation( fill_convert_request_operation ( itr->owner, itr->requestid, itr->amount, amount_to_issue ) );
+
+      remove( *itr );
+      itr = request_by_date.begin();
+   }
+
+   const auto& props = get_dynamic_global_properties();
+   modify( props, [&]( dynamic_global_property_object& p )
+   {
+       p.current_supply += net_ztr;
+       p.current_zbd_supply -= net_zbd;
+       p.virtual_supply += net_ztr;
+       p.virtual_supply -= net_zbd * get_feed_history().current_median_history;
+   } );
+}
+
+asset database::to_zbd( const asset& ztr )const
+{
+   return util::to_zbd( get_feed_history().current_median_history, ztr );
+}
+
+asset database::to_ztr( const asset& zbd )const
+{
+   return util::to_ztr( get_feed_history().current_median_history, zbd );
+}
+
+void database::account_recovery_processing()
+{
+   // Clear expired recovery requests
+   const auto& rec_req_idx = get_index< account_recovery_request_index >().indices().get< by_expiration >();
+   auto rec_req = rec_req_idx.begin();
+
+   while( rec_req != rec_req_idx.end() && rec_req->expires <= head_block_time() )
+   {
+      remove( *rec_req );
+      rec_req = rec_req_idx.begin();
+   }
+
+   // Clear invalid historical authorities
+   const auto& hist_idx = get_index< owner_authority_history_index >().indices(); //by id
+   auto hist = hist_idx.begin();
+
+   while( hist != hist_idx.end() && time_point_sec( hist->last_valid_time + ZATTERA_OWNER_AUTH_RECOVERY_PERIOD ) < head_block_time() )
+   {
+      remove( *hist );
+      hist = hist_idx.begin();
+   }
+
+   // Apply effective recovery_account changes
+   const auto& change_req_idx = get_index< change_recovery_account_request_index >().indices().get< by_effective_date >();
+   auto change_req = change_req_idx.begin();
+
+   while( change_req != change_req_idx.end() && change_req->effective_on <= head_block_time() )
+   {
+      modify( get_account( change_req->account_to_recover ), [&]( account_object& a )
+      {
+         a.recovery_account = change_req->recovery_account;
+      });
+
+      remove( *change_req );
+      change_req = change_req_idx.begin();
+   }
+}
+
+void database::expire_escrow_ratification()
+{
+   const auto& escrow_idx = get_index< escrow_index >().indices().get< by_ratification_deadline >();
+   auto escrow_itr = escrow_idx.lower_bound( false );
+
+   while( escrow_itr != escrow_idx.end() && !escrow_itr->is_approved() && escrow_itr->ratification_deadline <= head_block_time() )
+   {
+      const auto& old_escrow = *escrow_itr;
+      ++escrow_itr;
+
+      adjust_balance( old_escrow.from, old_escrow.ztr_balance );
+      adjust_balance( old_escrow.from, old_escrow.zbd_balance );
+      adjust_balance( old_escrow.from, old_escrow.pending_fee );
+
+      remove( old_escrow );
+   }
+}
+
+void database::process_decline_voting_rights()
+{
+   const auto& request_idx = get_index< decline_voting_rights_request_index >().indices().get< by_effective_date >();
+   auto itr = request_idx.begin();
+
+   while( itr != request_idx.end() && itr->effective_date <= head_block_time() )
+   {
+      const auto& account = get< account_object, by_name >( itr->account );
+
+      /// remove all current votes
+      std::array<share_type, ZATTERA_MAX_PROXY_RECURSION_DEPTH+1> delta;
+      delta[0] = -account.vesting_shares.amount;
+      for( int i = 0; i < ZATTERA_MAX_PROXY_RECURSION_DEPTH; ++i )
+         delta[i+1] = -account.proxied_vsf_votes[i];
+      adjust_proxied_witness_votes( account, delta );
+
+      clear_witness_votes( account );
+
+      modify( account, [&]( account_object& a )
+      {
+         a.can_vote = false;
+         a.proxy = ZATTERA_PROXY_TO_SELF_ACCOUNT;
+      });
+
+      remove( *itr );
+      itr = request_idx.begin();
+   }
+}
+
+time_point_sec database::head_block_time()const
+{
+   return get_dynamic_global_properties().time;
+}
+
+uint32_t database::head_block_num()const
+{
+   return get_dynamic_global_properties().head_block_number;
+}
+
+block_id_type database::head_block_id()const
+{
+   return get_dynamic_global_properties().head_block_id;
+}
+
+node_property_object& database::node_properties()
+{
+   return _node_property_object;
+}
+
+uint32_t database::last_non_undoable_block_num() const
+{
+   return get_dynamic_global_properties().last_irreversible_block_num;
+}
+
+void database::initialize_evaluators()
+{
+   _my->_evaluator_registry.register_evaluator< vote_evaluator                           >();
+   _my->_evaluator_registry.register_evaluator< comment_evaluator                        >();
+   _my->_evaluator_registry.register_evaluator< comment_options_evaluator                >();
+   _my->_evaluator_registry.register_evaluator< delete_comment_evaluator                 >();
+   _my->_evaluator_registry.register_evaluator< transfer_evaluator                       >();
+   _my->_evaluator_registry.register_evaluator< transfer_to_vesting_evaluator            >();
+   _my->_evaluator_registry.register_evaluator< withdraw_vesting_evaluator               >();
+   _my->_evaluator_registry.register_evaluator< set_withdraw_vesting_route_evaluator     >();
+   _my->_evaluator_registry.register_evaluator< account_create_evaluator                 >();
+   _my->_evaluator_registry.register_evaluator< account_update_evaluator                 >();
+   _my->_evaluator_registry.register_evaluator< witness_update_evaluator                 >();
+   _my->_evaluator_registry.register_evaluator< account_witness_vote_evaluator           >();
+   _my->_evaluator_registry.register_evaluator< account_witness_proxy_evaluator          >();
+   _my->_evaluator_registry.register_evaluator< custom_evaluator                         >();
+   _my->_evaluator_registry.register_evaluator< custom_binary_evaluator                  >();
+   _my->_evaluator_registry.register_evaluator< custom_json_evaluator                    >();
+   _my->_evaluator_registry.register_evaluator< report_over_production_evaluator         >();
+   _my->_evaluator_registry.register_evaluator< feed_publish_evaluator                   >();
+   _my->_evaluator_registry.register_evaluator< convert_evaluator                        >();
+   _my->_evaluator_registry.register_evaluator< limit_order_create_evaluator             >();
+   _my->_evaluator_registry.register_evaluator< limit_order_create2_evaluator            >();
+   _my->_evaluator_registry.register_evaluator< limit_order_cancel_evaluator             >();
+   _my->_evaluator_registry.register_evaluator< claim_account_evaluator                  >();
+   _my->_evaluator_registry.register_evaluator< create_claimed_account_evaluator         >();
+   _my->_evaluator_registry.register_evaluator< request_account_recovery_evaluator       >();
+   _my->_evaluator_registry.register_evaluator< recover_account_evaluator                >();
+   _my->_evaluator_registry.register_evaluator< change_recovery_account_evaluator        >();
+   _my->_evaluator_registry.register_evaluator< escrow_transfer_evaluator                >();
+   _my->_evaluator_registry.register_evaluator< escrow_approve_evaluator                 >();
+   _my->_evaluator_registry.register_evaluator< escrow_dispute_evaluator                 >();
+   _my->_evaluator_registry.register_evaluator< escrow_release_evaluator                 >();
+   _my->_evaluator_registry.register_evaluator< transfer_to_savings_evaluator            >();
+   _my->_evaluator_registry.register_evaluator< transfer_from_savings_evaluator          >();
+   _my->_evaluator_registry.register_evaluator< cancel_transfer_from_savings_evaluator   >();
+   _my->_evaluator_registry.register_evaluator< decline_voting_rights_evaluator          >();
+   _my->_evaluator_registry.register_evaluator< reset_account_evaluator                  >();
+   _my->_evaluator_registry.register_evaluator< set_reset_account_evaluator              >();
+   _my->_evaluator_registry.register_evaluator< claim_reward_balance_evaluator           >();
+   _my->_evaluator_registry.register_evaluator< account_create_with_delegation_evaluator >();
+   _my->_evaluator_registry.register_evaluator< delegate_vesting_shares_evaluator        >();
+   _my->_evaluator_registry.register_evaluator< witness_set_properties_evaluator         >();
+}
+
+
+void database::set_custom_operation_interpreter( const std::string& id, std::shared_ptr< custom_operation_interpreter > registry )
+{
+   bool inserted = _custom_operation_interpreters.emplace( id, registry ).second;
+   // This assert triggering means we're mis-configured (multiple registrations of custom JSON evaluator for same ID)
+   FC_ASSERT( inserted );
+}
+
+std::shared_ptr< custom_operation_interpreter > database::get_custom_json_evaluator( const std::string& id )
+{
+   auto it = _custom_operation_interpreters.find( id );
+   if( it != _custom_operation_interpreters.end() )
+      return it->second;
+   return std::shared_ptr< custom_operation_interpreter >();
+}
+
+void database::initialize_indexes()
+{
+   add_core_index< dynamic_global_property_index           >(*this);
+   add_core_index< account_index                           >(*this);
+   add_core_index< account_authority_index                 >(*this);
+   add_core_index< witness_index                           >(*this);
+   add_core_index< transaction_index                       >(*this);
+   add_core_index< block_summary_index                     >(*this);
+   add_core_index< witness_schedule_index                  >(*this);
+   add_core_index< comment_index                           >(*this);
+   add_core_index< comment_content_index                   >(*this);
+   add_core_index< comment_vote_index                      >(*this);
+   add_core_index< witness_vote_index                      >(*this);
+   add_core_index< limit_order_index                       >(*this);
+   add_core_index< feed_history_index                      >(*this);
+   add_core_index< convert_request_index                   >(*this);
+   add_core_index< operation_index                         >(*this);
+   add_core_index< account_history_index                   >(*this);
+   add_core_index< hardfork_property_index                 >(*this);
+   add_core_index< withdraw_vesting_route_index            >(*this);
+   add_core_index< owner_authority_history_index           >(*this);
+   add_core_index< account_recovery_request_index          >(*this);
+   add_core_index< change_recovery_account_request_index   >(*this);
+   add_core_index< escrow_index                            >(*this);
+   add_core_index< savings_withdraw_index                  >(*this);
+   add_core_index< decline_voting_rights_request_index     >(*this);
+   add_core_index< reward_fund_index                       >(*this);
+   add_core_index< vesting_delegation_index                >(*this);
+   add_core_index< vesting_delegation_expiration_index     >(*this);
+
+   _plugin_index_signal();
+}
+
+const std::string& database::get_json_schema()const
+{
+   return _json_schema;
+}
+
+void database::init_schema()
+{
+   /*done_adding_indexes();
+
+   db_schema ds;
+
+   std::vector< std::shared_ptr< abstract_schema > > schema_list;
+
+   std::vector< object_schema > object_schemas;
+   get_object_schemas( object_schemas );
+
+   for( const object_schema& oschema : object_schemas )
+   {
+      ds.object_types.emplace_back();
+      ds.object_types.back().space_type.first = oschema.space_id;
+      ds.object_types.back().space_type.second = oschema.type_id;
+      oschema.schema->get_name( ds.object_types.back().type );
+      schema_list.push_back( oschema.schema );
+   }
+
+   std::shared_ptr< abstract_schema > operation_schema = get_schema_for_type< operation >();
+   operation_schema->get_name( ds.operation_type );
+   schema_list.push_back( operation_schema );
+
+   for( const std::pair< std::string, std::shared_ptr< custom_operation_interpreter > >& p : _custom_operation_interpreters )
+   {
+      ds.custom_operation_types.emplace_back();
+      ds.custom_operation_types.back().id = p.first;
+      schema_list.push_back( p.second->get_operation_schema() );
+      schema_list.back()->get_name( ds.custom_operation_types.back().type );
+   }
+
+   graphene::db::add_dependent_schemas( schema_list );
+   std::sort( schema_list.begin(), schema_list.end(),
+      []( const std::shared_ptr< abstract_schema >& a,
+          const std::shared_ptr< abstract_schema >& b )
+      {
+         return a->id < b->id;
+      } );
+   auto new_end = std::unique( schema_list.begin(), schema_list.end(),
+      []( const std::shared_ptr< abstract_schema >& a,
+          const std::shared_ptr< abstract_schema >& b )
+      {
+         return a->id == b->id;
+      } );
+   schema_list.erase( new_end, schema_list.end() );
+
+   for( std::shared_ptr< abstract_schema >& s : schema_list )
+   {
+      std::string tname;
+      s->get_name( tname );
+      FC_ASSERT( ds.types.find( tname ) == ds.types.end(), "types with different ID's found for name ${tname}", ("tname", tname) );
+      std::string ss;
+      s->get_str_schema( ss );
+      ds.types.emplace( tname, ss );
+   }
+
+   _json_schema = fc::json::to_string( ds );
+   return;*/
+}
+
+void database::init_genesis( uint64_t init_supply )
+{
+   try
+   {
+      struct auth_inhibitor
+      {
+         auth_inhibitor(database& db) : db(db), old_flags(db.node_properties().skip_flags)
+         { db.node_properties().skip_flags |= skip_authority_check; }
+         ~auth_inhibitor()
+         { db.node_properties().skip_flags = old_flags; }
+      private:
+         database& db;
+         uint32_t old_flags;
+      } inhibitor(*this);
+
+      // Create blockchain accounts
+      public_key_type      init_public_key(ZATTERA_INIT_PUBLIC_KEY);
+
+      create< account_object >( [&]( account_object& a )
+      {
+         a.name = ZATTERA_NULL_ACCOUNT;
+      } );
+      create< account_authority_object >( [&]( account_authority_object& auth )
+      {
+         auth.account = ZATTERA_NULL_ACCOUNT;
+         auth.owner.weight_threshold = 1;
+         auth.active.weight_threshold = 1;
+         auth.posting = authority();
+         auth.posting.weight_threshold = 1;
+      });
+
+      create< account_object >( [&]( account_object& a )
+      {
+         a.name = ZATTERA_TEMP_ACCOUNT;
+      } );
+      create< account_authority_object >( [&]( account_authority_object& auth )
+      {
+         auth.account = ZATTERA_TEMP_ACCOUNT;
+         auth.owner.weight_threshold = 0;
+         auth.active.weight_threshold = 0;
+         auth.posting = authority();
+         auth.posting.weight_threshold = 1;
+      });
+
+      for( int i = 0; i < ZATTERA_NUM_GENESIS_WITNESSES; ++i )
+      {
+         create< account_object >( [&]( account_object& a )
+         {
+            a.name = ZATTERA_GENESIS_WITNESS_NAME + ( i ? fc::to_string( i ) : std::string() );
+            a.memo_key = init_public_key;
+            a.balance  = asset( i ? 0 : init_supply, ZTR_SYMBOL );
+         } );
+
+         create< account_authority_object >( [&]( account_authority_object& auth )
+         {
+            auth.account = ZATTERA_GENESIS_WITNESS_NAME + ( i ? fc::to_string( i ) : std::string() );
+            auth.owner.add_authority( init_public_key, 1 );
+            auth.owner.weight_threshold = 1;
+            auth.active  = auth.owner;
+            auth.posting = auth.active;
+         });
+
+         create< witness_object >( [&]( witness_object& w )
+         {
+            w.owner       = ZATTERA_GENESIS_WITNESS_NAME + ( i ? fc::to_string(i) : std::string() );
+            w.signing_key = init_public_key;
+            w.schedule    = witness_object::timeshare;
+         } );
+      }
+
+      create< dynamic_global_property_object >( [&]( dynamic_global_property_object& p )
+      {
+         p.current_witness = ZATTERA_GENESIS_WITNESS_NAME;
+         p.time = ZATTERA_GENESIS_TIME;
+         p.recent_slots_filled = fc::uint128::max_value();
+         p.participation_count = 128;
+         p.current_supply = asset( init_supply, ZTR_SYMBOL );
+         p.virtual_supply = p.current_supply;
+         p.maximum_block_size = ZATTERA_MAX_BLOCK_SIZE;
+         p.vote_power_reserve_rate = ZATTERA_REDUCED_VOTE_POWER_RATE;
+         p.delegation_return_period = ZATTERA_DELEGATION_RETURN_PERIOD;
+      } );
+
+      // Nothing to do
+      create< feed_history_object >( [&]( feed_history_object& o ) {});
+      for( int i = 0; i < 0x10000; i++ )
+         create< block_summary_object >( [&]( block_summary_object& ) {});
+      create< hardfork_property_object >( [&](hardfork_property_object& hpo )
+      {
+         hpo.processed_hardforks.push_back( ZATTERA_GENESIS_TIME );
+      } );
+
+      // Create witness scheduler
+      create< witness_schedule_object >( [&]( witness_schedule_object& wso )
+      {
+         wso.current_shuffled_witnesses[0] = ZATTERA_GENESIS_WITNESS_NAME;
+         wso.max_voted_witnesses = ZATTERA_MAX_VOTED_WITNESSES;
+         wso.max_runner_witnesses = ZATTERA_MAX_RUNNER_WITNESSES;
+      } );
+
+      // Create reward fund for post rewards
+      auto post_rf = create< reward_fund_object >( [&]( reward_fund_object& rfo )
+      {
+         rfo.name = ZATTERA_POST_REWARD_FUND_NAME;
+         rfo.last_update = ZATTERA_GENESIS_TIME;
+         rfo.content_constant = ZATTERA_CONTENT_CONSTANT;
+         rfo.percent_curation_rewards = ZATTERA_1_PERCENT * 25;
+         rfo.percent_content_rewards = ZATTERA_100_PERCENT;
+         rfo.reward_balance = asset( 0, ZTR_SYMBOL );
+         rfo.recent_claims = 0;
+         rfo.author_reward_curve = curve_id::linear;
+         rfo.curation_reward_curve = curve_id::square_root;
+      });
+
+      // Reward fund must have id 0 for payout processing optimization
+      FC_ASSERT( post_rf.id._id == 0, "reward_fund_object must have id 0" );
+   }
+   FC_CAPTURE_AND_RETHROW()
+}
+
+
+void database::validate_transaction( const signed_transaction& trx )
+{
+   database::with_write_lock( [&]()
+   {
+      auto session = start_undo_session();
+      _apply_transaction( trx );
+      session.undo();
+   });
+}
+
+void database::notify_changed_objects()
+{
+   try
+   {
+      /*vector< chainbase::generic_id > ids;
+      get_changed_ids( ids );
+      ZATTERA_TRY_NOTIFY( changed_objects, ids )*/
+      /*
+      if( _undo_db.enabled() )
+      {
+         const auto& head_undo = _undo_db.head();
+         vector<object_id_type> changed_ids;  changed_ids.reserve(head_undo.old_values.size());
+         for( const auto& item : head_undo.old_values ) changed_ids.push_back(item.first);
+         for( const auto& item : head_undo.new_ids ) changed_ids.push_back(item);
+         vector<const object*> removed;
+         removed.reserve( head_undo.removed.size() );
+         for( const auto& item : head_undo.removed )
+         {
+            changed_ids.push_back( item.first );
+            removed.emplace_back( item.second.get() );
+         }
+         ZATTERA_TRY_NOTIFY( changed_objects, changed_ids )
+      }
+      */
+   }
+   FC_CAPTURE_AND_RETHROW()
+
+}
+
+void database::set_flush_interval( uint32_t flush_blocks )
+{
+   _flush_blocks = flush_blocks;
+   _next_flush_block = 0;
+}
+
+//////////////////// private methods ////////////////////
+
+void database::apply_block( const signed_block& next_block, uint32_t skip )
+{ try {
+   //fc::time_point begin_time = fc::time_point::now();
+
+   auto block_num = next_block.block_num();
+   if( _checkpoints.size() && _checkpoints.rbegin()->second != block_id_type() )
+   {
+      auto itr = _checkpoints.find( block_num );
+      if( itr != _checkpoints.end() )
+         FC_ASSERT( next_block.id() == itr->second, "Block did not match checkpoint", ("checkpoint",*itr)("block_id",next_block.id()) );
+
+      if( _checkpoints.rbegin()->first >= block_num )
+         skip = skip_witness_signature
+              | skip_transaction_signatures
+              | skip_transaction_dupe_check
+              | skip_fork_db
+              | skip_block_size_check
+              | skip_tapos_check
+              | skip_authority_check
+              /* | skip_merkle_check While blockchain is being downloaded, txs need to be validated against block headers */
+              | skip_undo_history_check
+              | skip_witness_schedule_check
+              | skip_validate
+              | skip_validate_invariants
+              ;
+   }
+
+   detail::with_skip_flags( *this, skip, [&]()
+   {
+      _apply_block( next_block );
+   } );
+
+   /*try
+   {
+   /// check invariants
+   if( is_producing() || !( skip & skip_validate_invariants ) )
+      validate_invariants();
+   }
+   FC_CAPTURE_AND_RETHROW( (next_block) );*/
+
+   //fc::time_point end_time = fc::time_point::now();
+   //fc::microseconds dt = end_time - begin_time;
+   if( _flush_blocks != 0 )
+   {
+      if( _next_flush_block == 0 )
+      {
+         uint32_t lep = block_num + 1 + _flush_blocks * 9 / 10;
+         uint32_t rep = block_num + 1 + _flush_blocks;
+
+         // use time_point::now() as RNG source to pick block randomly between lep and rep
+         uint32_t span = rep - lep;
+         uint32_t x = lep;
+         if( span > 0 )
+         {
+            uint64_t now = uint64_t( fc::time_point::now().time_since_epoch().count() );
+            x += now % span;
+         }
+         _next_flush_block = x;
+         //ilog( "Next flush scheduled at block ${b}", ("b", x) );
+      }
+
+      if( _next_flush_block == block_num )
+      {
+         _next_flush_block = 0;
+         //ilog( "Flushing database shared memory at block ${b}", ("b", block_num) );
+         chainbase::database::flush();
+      }
+   }
+
+} FC_CAPTURE_AND_RETHROW( (next_block) ) }
+
+void database::check_free_memory( bool force_print, uint32_t current_block_num )
+{
+   uint64_t free_mem = get_free_memory();
+   uint64_t max_mem = get_max_memory();
+
+   if( BOOST_UNLIKELY( _shared_file_full_threshold != 0 && _shared_file_scale_rate != 0 && free_mem < ( ( uint128_t( ZATTERA_100_PERCENT - _shared_file_full_threshold ) * max_mem ) / ZATTERA_100_PERCENT ).to_uint64() ) )
+   {
+      uint64_t new_max = ( uint128_t( max_mem * _shared_file_scale_rate ) / ZATTERA_100_PERCENT ).to_uint64() + max_mem;
+
+      wlog( "Memory is almost full, increasing to ${mem}M", ("mem", new_max / (1024*1024)) );
+
+      resize( new_max );
+
+      uint32_t free_mb = uint32_t( get_free_memory() / (1024*1024) );
+      wlog( "Free memory is now ${free}M", ("free", free_mb) );
+      _last_free_gb_printed = free_mb / 1024;
+   }
+   else
+   {
+      uint32_t free_gb = uint32_t( free_mem / (1024*1024*1024) );
+      if( BOOST_UNLIKELY( force_print || (free_gb < _last_free_gb_printed) || (free_gb > _last_free_gb_printed+1) ) )
+      {
+         ilog( "Free memory is now ${n}G. Current block number: ${block}", ("n", free_gb)("block",current_block_num) );
+         _last_free_gb_printed = free_gb;
+      }
+
+      if( BOOST_UNLIKELY( free_gb == 0 ) )
+      {
+         uint32_t free_mb = uint32_t( free_mem / (1024*1024) );
+
+   #ifdef IS_TEST_NET
+      if( !disable_low_mem_warning )
+   #endif
+         if( free_mb <= 100 && head_block_num() % 10 == 0 )
+            elog( "Free memory is now ${n}M. Increase shared file size immediately!" , ("n", free_mb) );
+      }
+   }
+}
+
+void database::_apply_block( const signed_block& next_block )
+{ try {
+   block_notification note( next_block );
+
+   notify_pre_apply_block( note );
+
+   const uint32_t next_block_num = note.block_num;
+
+   BOOST_SCOPE_EXIT( this_ )
+   {
+      this_->_currently_processing_block_id.reset();
+   } BOOST_SCOPE_EXIT_END
+   _currently_processing_block_id = note.block_id;
+
+   uint32_t skip = get_node_properties().skip_flags;
+
+   _current_block_num    = next_block_num;
+   _current_trx_in_block = 0;
+   _current_virtual_op   = 0;
+
+   if( BOOST_UNLIKELY( next_block_num == 1 ) )
+   {
+      // For every existing before the head_block_time (genesis time), apply the hardfork
+      // This allows the test net to launch with past hardforks and apply the next harfork when running
+
+      uint32_t n;
+      for( n=0; n<ZATTERA_NUM_HARDFORKS; n++ )
+      {
+         if( _hardfork_times[n+1] > next_block.timestamp )
+            break;
+      }
+
+      if( n > 0 )
+      {
+         ilog( "Processing ${n} genesis hardforks", ("n", n) );
+         set_hardfork( n, true );
+
+         const hardfork_property_object& hardfork_state = get_hardfork_property_object();
+         FC_ASSERT( hardfork_state.current_hardfork_version == _hardfork_versions[n], "Unexpected genesis hardfork state" );
+
+         const auto& witness_idx = get_index<witness_index>().indices().get<by_id>();
+         vector<witness_id_type> wit_ids_to_update;
+         for( auto it=witness_idx.begin(); it!=witness_idx.end(); ++it )
+            wit_ids_to_update.push_back(it->id);
+
+         for( witness_id_type wit_id : wit_ids_to_update )
+         {
+            modify( get( wit_id ), [&]( witness_object& wit )
+            {
+               wit.running_version = _hardfork_versions[n];
+               wit.hardfork_version_vote = _hardfork_versions[n];
+               wit.hardfork_time_vote = _hardfork_times[n];
+            } );
+         }
+      }
+   }
+
+   if( !( skip & skip_merkle_check ) )
+   {
+      auto merkle_root = next_block.calculate_merkle_root();
+
+      try
+      {
+         FC_ASSERT( next_block.transaction_merkle_root == merkle_root, "Merkle check failed", ("next_block.transaction_merkle_root",next_block.transaction_merkle_root)("calc",merkle_root)("next_block",next_block)("id",next_block.id()) );
+      }
+      catch( fc::assert_exception& e )
+      {
+         const auto& merkle_map = get_shared_db_merkle();
+         auto itr = merkle_map.find( next_block_num );
+
+         if( itr == merkle_map.end() || itr->second != merkle_root )
+            throw e;
+      }
+   }
+
+   const witness_object& signing_witness = validate_block_header(skip, next_block);
+
+   const auto& gprops = get_dynamic_global_properties();
+   auto block_size = fc::raw::pack_size( next_block );
+   FC_ASSERT( block_size <= gprops.maximum_block_size, "Block Size is too Big", ("next_block_num",next_block_num)("block_size", block_size)("max",gprops.maximum_block_size) );
+
+   if( block_size < ZATTERA_MIN_BLOCK_SIZE )
+   {
+      elog( "Block size is too small",
+         ("next_block_num",next_block_num)("block_size", block_size)("min",ZATTERA_MIN_BLOCK_SIZE)
+      );
+   }
+
+   /// modify current witness so we can track who produced this block
+   /// and pay witness rewards accordingly
+   modify( gprops, [&]( dynamic_global_property_object& dgp ){
+      dgp.current_witness = next_block.witness;
+   });
+
+   /// parse witness version reporting
+   process_header_extensions( next_block );
+
+   const auto& witness = get_witness( next_block.witness );
+   const auto& hardfork_state = get_hardfork_property_object();
+   FC_ASSERT( witness.running_version >= hardfork_state.current_hardfork_version,
+      "Block produced by witness that is not running current hardfork",
+      ("witness",witness)("next_block.witness",next_block.witness)("hardfork_state", hardfork_state)
+   );
+
+   for( const auto& trx : next_block.transactions )
+   {
+      /* We do not need to push the undo state for each transaction
+       * because they either all apply and are valid or the
+       * entire block fails to apply.  We only need an "undo" state
+       * for transactions when validating broadcast transactions or
+       * when building a block.
+       */
+      apply_transaction( trx, skip );
+      ++_current_trx_in_block;
+   }
+
+   _current_trx_in_block = -1;
+   _current_op_in_trx = 0;
+   _current_virtual_op = 0;
+
+   update_global_dynamic_data(next_block);
+   update_signing_witness(signing_witness, next_block);
+
+   update_last_irreversible_block();
+
+   create_block_summary(next_block);
+   clear_expired_transactions();
+   clear_expired_orders();
+   clear_expired_delegations();
+   update_witness_schedule(*this);
+
+   update_median_feed();
+   update_virtual_supply();
+
+   clear_null_account_balance();
+   process_funds();
+   process_conversions();
+   process_comment_cashout();
+   process_vesting_withdrawals();
+   process_savings_withdraws();
+   update_virtual_supply();
+
+   account_recovery_processing();
+   expire_escrow_ratification();
+   process_decline_voting_rights();
+
+   process_hardforks();
+
+   // notify observers that the block has been applied
+   notify_post_apply_block( note );
+
+   notify_changed_objects();
+} //FC_CAPTURE_AND_RETHROW( (next_block.block_num()) )  }
+FC_CAPTURE_LOG_AND_RETHROW( (next_block.block_num()) )
+}
+
+struct process_header_visitor
+{
+   process_header_visitor( const std::string& witness, database& db ) : _witness( witness ), _db( db ) {}
+
+   typedef void result_type;
+
+   const std::string& _witness;
+   database& _db;
+
+   void operator()( const void_t& obj ) const
+   {
+      //Nothing to do.
+   }
+
+   void operator()( const version& reported_version ) const
+   {
+      const auto& signing_witness = _db.get_witness( _witness );
+      //idump( (next_block.witness)(signing_witness.running_version)(reported_version) );
+
+      if( reported_version != signing_witness.running_version )
+      {
+         _db.modify( signing_witness, [&]( witness_object& wo )
+         {
+            wo.running_version = reported_version;
+         });
+      }
+   }
+
+   void operator()( const hardfork_version_vote& hfv ) const
+   {
+      const auto& signing_witness = _db.get_witness( _witness );
+      //idump( (next_block.witness)(signing_witness.running_version)(hfv) );
+
+      if( hfv.hf_version != signing_witness.hardfork_version_vote || hfv.hf_time != signing_witness.hardfork_time_vote )
+         _db.modify( signing_witness, [&]( witness_object& wo )
+         {
+            wo.hardfork_version_vote = hfv.hf_version;
+            wo.hardfork_time_vote = hfv.hf_time;
+         });
+   }
+
+   template<typename T>
+   void operator()( const T& unknown_obj ) const
+   {
+      FC_ASSERT( false, "Unknown extension in block header" );
+   }
+};
+
+void database::process_header_extensions( const signed_block& next_block )
+{
+   process_header_visitor _v( next_block.witness, *this );
+
+   for( const auto& e : next_block.extensions )
+      e.visit( _v );
+}
+
+void database::update_median_feed() {
+try {
+   if( (head_block_num() % ZATTERA_FEED_INTERVAL_BLOCKS) != 0 )
+      return;
+
+   auto now = head_block_time();
+   const witness_schedule_object& wso = get_witness_schedule_object();
+   vector<price> feeds; feeds.reserve( wso.num_scheduled_witnesses );
+   for( int i = 0; i < wso.num_scheduled_witnesses; i++ )
+   {
+      const auto& wit = get_witness( wso.current_shuffled_witnesses[i] );
+      if( now < wit.last_zbd_exchange_update + ZATTERA_MAX_FEED_AGE_SECONDS
+         && !wit.zbd_exchange_rate.is_null() )
+      {
+         feeds.push_back( wit.zbd_exchange_rate );
+      }
+   }
+
+   if( feeds.size() >= ZATTERA_MIN_FEEDS )
+   {
+      std::sort( feeds.begin(), feeds.end() );
+      auto median_feed = feeds[feeds.size()/2];
+
+      modify( get_feed_history(), [&]( feed_history_object& fho )
+      {
+         fho.price_history.push_back( median_feed );
+         size_t zattera_feed_history_window = ZATTERA_FEED_HISTORY_WINDOW;
+
+         if( fho.price_history.size() > zattera_feed_history_window )
+            fho.price_history.pop_front();
+
+         if( fho.price_history.size() )
+         {
+            /// BW-TODO Why deque is used here ? Also why don't make copy of whole container ?
+            std::deque< price > copy;
+            for( const auto& i : fho.price_history )
+            {
+               copy.push_back( i );
+            }
+
+            std::sort( copy.begin(), copy.end() ); /// TODO: use nth_item
+            fho.current_median_history = copy[copy.size()/2];
+
+#ifdef IS_TEST_NET
+            if( skip_price_feed_limit_check )
+               return;
+#endif
+            const auto& gpo = get_dynamic_global_properties();
+            price min_price( asset( 9 * gpo.current_zbd_supply.amount, ZBD_SYMBOL ), gpo.current_supply ); // This price limits ZBD to 10% market cap
+
+            if( min_price > fho.current_median_history )
+               fho.current_median_history = min_price;
+         }
+      });
+   }
+} FC_CAPTURE_AND_RETHROW() }
+
+void database::apply_transaction(const signed_transaction& trx, uint32_t skip)
+{
+   detail::with_skip_flags( *this, skip, [&]() { _apply_transaction(trx); });
+}
+
+void database::_apply_transaction(const signed_transaction& trx)
+{ try {
+   transaction_notification note(trx);
+   _current_trx_id = note.transaction_id;
+   const transaction_id_type& trx_id = note.transaction_id;
+   _current_virtual_op = 0;
+
+   uint32_t skip = get_node_properties().skip_flags;
+
+   if( !(skip&skip_validate) )   /* issue #505 explains why this skip_flag is disabled */
+      trx.validate();
+
+   auto& trx_idx = get_index<transaction_index>();
+   const chain_id_type& chain_id = get_chain_id();
+   // idump((trx_id)(skip&skip_transaction_dupe_check));
+   FC_ASSERT( (skip & skip_transaction_dupe_check) ||
+              trx_idx.indices().get<by_trx_id>().find(trx_id) == trx_idx.indices().get<by_trx_id>().end(),
+              "Duplicate transaction check failed", ("trx_ix", trx_id) );
+
+   if( !(skip & (skip_transaction_signatures | skip_authority_check) ) )
+   {
+      auto get_active  = [&]( const string& name ) { return authority( get< account_authority_object, by_account >( name ).active ); };
+      auto get_owner   = [&]( const string& name ) { return authority( get< account_authority_object, by_account >( name ).owner );  };
+      auto get_posting = [&]( const string& name ) { return authority( get< account_authority_object, by_account >( name ).posting );  };
+
+      try
+      {
+         trx.verify_authority( chain_id, get_active, get_owner, get_posting,
+            ZATTERA_MAX_SIG_CHECK_DEPTH, ZATTERA_MAX_AUTHORITY_MEMBERSHIP, ZATTERA_MAX_SIG_CHECK_ACCOUNTS );
+      }
+      catch( protocol::tx_missing_active_auth& e )
+      {
+         if( get_shared_db_merkle().find( head_block_num() + 1 ) == get_shared_db_merkle().end() )
+            throw e;
+      }
+   }
+
+   //Skip all manner of expiration and TaPoS checking if we're on block 1; It's impossible that the transaction is
+   //expired, and TaPoS makes no sense as no blocks exist.
+   if( BOOST_LIKELY(head_block_num() > 0) )
+   {
+      if( !(skip & skip_tapos_check) )
+      {
+         const auto& tapos_block_summary = get< block_summary_object >( trx.ref_block_num );
+         //Verify TaPoS block summary has correct ID prefix, and that this block's time is not past the expiration
+         ZATTERA_ASSERT( trx.ref_block_prefix == tapos_block_summary.block_id._hash[1], transaction_tapos_exception,
+                    "", ("trx.ref_block_prefix", trx.ref_block_prefix)
+                    ("tapos_block_summary",tapos_block_summary.block_id._hash[1]));
+      }
+
+      fc::time_point_sec now = head_block_time();
+
+      ZATTERA_ASSERT( trx.expiration <= now + fc::seconds(ZATTERA_MAX_TIME_UNTIL_EXPIRATION), transaction_expiration_exception,
+                  "", ("trx.expiration",trx.expiration)("now",now)("max_til_exp",ZATTERA_MAX_TIME_UNTIL_EXPIRATION));
+      // Simple solution to pending trx bug when now == trx.expiration
+      ZATTERA_ASSERT( now < trx.expiration, transaction_expiration_exception, "", ("now",now)("trx.exp",trx.expiration) );
+   }
+
+   //Insert transaction into unique transactions database.
+   if( !(skip & skip_transaction_dupe_check) )
+   {
+      create<transaction_object>([&](transaction_object& transaction) {
+         transaction.trx_id = trx_id;
+         transaction.expiration = trx.expiration;
+         fc::raw::pack_to_buffer( transaction.packed_trx, trx );
+      });
+   }
+
+   notify_pre_apply_transaction( note );
+
+   //Finally process the operations
+   _current_op_in_trx = 0;
+   for( const auto& op : trx.operations )
+   { try {
+      apply_operation(op);
+      ++_current_op_in_trx;
+     } FC_CAPTURE_AND_RETHROW( (op) );
+   }
+   _current_trx_id = transaction_id_type();
+
+   notify_post_apply_transaction( note );
+
+} FC_CAPTURE_AND_RETHROW( (trx) ) }
+
+void database::apply_operation(const operation& op)
+{
+   operation_notification note(op);
+   notify_pre_apply_operation( note );
+
+   if( _benchmark_dumper.is_enabled() )
+      _benchmark_dumper.begin();
+
+   _my->_evaluator_registry.get_evaluator( op ).apply( op );
+
+   if( _benchmark_dumper.is_enabled() )
+      _benchmark_dumper.end< true/*APPLY_CONTEXT*/ >( _my->_evaluator_registry.get_evaluator( op ).get_name( op ) );
+
+   notify_post_apply_operation( note );
+}
+
+
+template <typename TFunction> struct fcall {};
+
+template <typename TResult, typename... TArgs>
+struct fcall<TResult(TArgs...)>
+{
+   using TNotification = std::function<TResult(TArgs...)>;
+
+   fcall() = default;
+   fcall(const TNotification& func, util::advanced_benchmark_dumper& dumper,
+         const abstract_plugin& plugin, const std::string& item_name)
+         : _func(func), _benchmark_dumper(dumper)
+      {
+         _name = plugin.get_name() + item_name;
+      }
+
+   void operator () (TArgs&&... args)
+   {
+      if (_benchmark_dumper.is_enabled())
+         _benchmark_dumper.begin();
+
+      _func(std::forward<TArgs>(args)...);
+
+      if (_benchmark_dumper.is_enabled())
+         _benchmark_dumper.end(_name);
+   }
+
+private:
+   TNotification                    _func;
+   util::advanced_benchmark_dumper& _benchmark_dumper;
+   std::string                      _name;
+};
+
+template <typename TResult, typename... TArgs>
+struct fcall<std::function<TResult(TArgs...)>>
+   : public fcall<TResult(TArgs...)>
+{
+   typedef fcall<TResult(TArgs...)> TBase;
+   using TBase::TBase;
+};
+
+template <typename TSignal, typename TNotification>
+boost::signals2::connection database::connect_impl( TSignal& signal, const TNotification& func,
+   const abstract_plugin& plugin, int32_t group, const std::string& item_name )
+{
+   fcall<TNotification> fcall_wrapper(func,_benchmark_dumper,plugin,item_name);
+
+   return signal.connect(group, fcall_wrapper);
+}
+
+template< bool IS_PRE_OPERATION >
+boost::signals2::connection database::any_apply_operation_handler_impl( const apply_operation_handler_t& func,
+   const abstract_plugin& plugin, int32_t group )
+{
+   auto complex_func = [this, func, &plugin]( const operation_notification& o )
+   {
+      std::string name;
+
+      if (_benchmark_dumper.is_enabled())
+      {
+         if( _my->_evaluator_registry.is_evaluator( o.op ) )
+            name = _benchmark_dumper.generate_desc< IS_PRE_OPERATION >( plugin.get_name(), _my->_evaluator_registry.get_evaluator( o.op ).get_name( o.op ) );
+         else
+            name = util::advanced_benchmark_dumper::get_virtual_operation_name();
+
+         _benchmark_dumper.begin();
+      }
+
+      func( o );
+
+      if (_benchmark_dumper.is_enabled())
+         _benchmark_dumper.end( name );
+   };
+
+   if( IS_PRE_OPERATION )
+      return _pre_apply_operation_signal.connect(group, complex_func);
+   else
+      return _post_apply_operation_signal.connect(group, complex_func);
+}
+
+boost::signals2::connection database::add_pre_apply_operation_handler( const apply_operation_handler_t& func,
+   const abstract_plugin& plugin, int32_t group )
+{
+   return any_apply_operation_handler_impl< true/*IS_PRE_OPERATION*/ >( func, plugin, group );
+}
+
+boost::signals2::connection database::add_post_apply_operation_handler( const apply_operation_handler_t& func,
+   const abstract_plugin& plugin, int32_t group )
+{
+   return any_apply_operation_handler_impl< false/*IS_PRE_OPERATION*/ >( func, plugin, group );
+}
+
+boost::signals2::connection database::add_pre_apply_transaction_handler( const apply_transaction_handler_t& func,
+   const abstract_plugin& plugin, int32_t group )
+{
+   return connect_impl(_pre_apply_transaction_signal, func, plugin, group, "->transaction");
+}
+
+boost::signals2::connection database::add_post_apply_transaction_handler( const apply_transaction_handler_t& func,
+   const abstract_plugin& plugin, int32_t group )
+{
+   return connect_impl(_post_apply_transaction_signal, func, plugin, group, "<-transaction");
+}
+
+boost::signals2::connection database::add_pre_apply_block_handler( const apply_block_handler_t& func,
+   const abstract_plugin& plugin, int32_t group )
+{
+   return connect_impl(_pre_apply_block_signal, func, plugin, group, "->block");
+}
+
+boost::signals2::connection database::add_post_apply_block_handler( const apply_block_handler_t& func,
+   const abstract_plugin& plugin, int32_t group )
+{
+   return connect_impl(_post_apply_block_signal, func, plugin, group, "<-block");
+}
+
+boost::signals2::connection database::add_irreversible_block_handler( const irreversible_block_handler_t& func,
+   const abstract_plugin& plugin, int32_t group )
+{
+   return connect_impl(_on_irreversible_block, func, plugin, group, "<-irreversible");
+}
+
+boost::signals2::connection database::add_pre_reindex_handler(const reindex_handler_t& func,
+   const abstract_plugin& plugin, int32_t group )
+{
+   return connect_impl(_pre_reindex_signal, func, plugin, group, "->reindex");
+}
+
+boost::signals2::connection database::add_post_reindex_handler(const reindex_handler_t& func,
+   const abstract_plugin& plugin, int32_t group )
+{
+   return connect_impl(_post_reindex_signal, func, plugin, group, "<-reindex");
+}
+
+const witness_object& database::validate_block_header( uint32_t skip, const signed_block& next_block )const
+{ try {
+   FC_ASSERT( head_block_id() == next_block.previous, "", ("head_block_id",head_block_id())("next.prev",next_block.previous) );
+   FC_ASSERT( head_block_time() < next_block.timestamp, "", ("head_block_time",head_block_time())("next",next_block.timestamp)("blocknum",next_block.block_num()) );
+   const witness_object& witness = get_witness( next_block.witness );
+
+   if( !(skip&skip_witness_signature) )
+      FC_ASSERT( next_block.validate_signee( witness.signing_key ) );
+
+   if( !(skip&skip_witness_schedule_check) )
+   {
+      uint32_t slot_num = get_slot_at_time( next_block.timestamp );
+      FC_ASSERT( slot_num > 0 );
+
+      string scheduled_witness = get_scheduled_witness( slot_num );
+
+      FC_ASSERT( witness.owner == scheduled_witness, "Witness produced block at wrong time",
+                 ("block witness",next_block.witness)("scheduled",scheduled_witness)("slot_num",slot_num) );
+   }
+
+   return witness;
+} FC_CAPTURE_AND_RETHROW() }
+
+void database::create_block_summary(const signed_block& next_block)
+{ try {
+   block_summary_id_type sid( next_block.block_num() & 0xffff );
+   modify( get< block_summary_object >( sid ), [&](block_summary_object& p) {
+         p.block_id = next_block.id();
+   });
+} FC_CAPTURE_AND_RETHROW() }
+
+void database::update_global_dynamic_data( const signed_block& b )
+{ try {
+   const dynamic_global_property_object& _dgp =
+      get_dynamic_global_properties();
+
+   uint32_t missed_blocks = 0;
+   if( head_block_time() != fc::time_point_sec() )
+   {
+      missed_blocks = get_slot_at_time( b.timestamp );
+      assert( missed_blocks != 0 );
+      missed_blocks--;
+      for( uint32_t i = 0; i < missed_blocks; ++i )
+      {
+         const auto& witness_missed = get_witness( get_scheduled_witness( i + 1 ) );
+         if(  witness_missed.owner != b.witness )
+         {
+            modify( witness_missed, [&]( witness_object& w )
+            {
+               w.total_missed++;
+               if( head_block_num() - w.last_confirmed_block_num  > ZATTERA_BLOCKS_PER_DAY )
+               {
+                  w.signing_key = public_key_type();
+                  push_virtual_operation( shutdown_witness_operation( w.owner ) );
+               }
+            } );
+         }
+      }
+   }
+
+   // dynamic global properties updating
+   modify( _dgp, [&]( dynamic_global_property_object& dgp )
+   {
+      // This is constant time assuming 100% participation. It is O(B) otherwise (B = Num blocks between update)
+      for( uint32_t i = 0; i < missed_blocks + 1; i++ )
+      {
+         dgp.participation_count -= dgp.recent_slots_filled.hi & 0x8000000000000000ULL ? 1 : 0;
+         dgp.recent_slots_filled = ( dgp.recent_slots_filled << 1 ) + ( i == 0 ? 1 : 0 );
+         dgp.participation_count += ( i == 0 ? 1 : 0 );
+      }
+
+      dgp.head_block_number = b.block_num();
+      // Following FC_ASSERT should never fail, as _currently_processing_block_id is always set by caller
+      FC_ASSERT( _currently_processing_block_id.valid() );
+      dgp.head_block_id = *_currently_processing_block_id;
+      dgp.time = b.timestamp;
+      dgp.current_aslot += missed_blocks+1;
+   } );
+
+   if( !(get_node_properties().skip_flags & skip_undo_history_check) )
+   {
+      ZATTERA_ASSERT( _dgp.head_block_number - _dgp.last_irreversible_block_num  < ZATTERA_MAX_UNDO_HISTORY, undo_database_exception,
+                 "The database does not have enough undo history to support a blockchain with so many missed blocks. "
+                 "Please add a checkpoint if you would like to continue applying blocks beyond this point.",
+                 ("last_irreversible_block_num",_dgp.last_irreversible_block_num)("head", _dgp.head_block_number)
+                 ("max_undo",ZATTERA_MAX_UNDO_HISTORY) );
+   }
+} FC_CAPTURE_AND_RETHROW() }
+
+void database::update_virtual_supply()
+{ try {
+   modify( get_dynamic_global_properties(), [&]( dynamic_global_property_object& dgp )
+   {
+      dgp.virtual_supply = dgp.current_supply
+         + ( get_feed_history().current_median_history.is_null() ? asset( 0, ZTR_SYMBOL ) : dgp.current_zbd_supply * get_feed_history().current_median_history );
+
+      auto median_price = get_feed_history().current_median_history;
+
+      if( !median_price.is_null() )
+      {
+         auto percent_zbd = uint16_t( ( ( fc::uint128_t( ( dgp.current_zbd_supply * get_feed_history().current_median_history ).amount.value ) * ZATTERA_100_PERCENT )
+            / dgp.virtual_supply.amount.value ).to_uint64() );
+
+         if( percent_zbd <= ZATTERA_ZBD_START_PERCENT )
+            dgp.zbd_print_rate = ZATTERA_100_PERCENT;
+         else if( percent_zbd >= ZATTERA_ZBD_STOP_PERCENT )
+            dgp.zbd_print_rate = 0;
+         else
+            dgp.zbd_print_rate = ( ( ZATTERA_ZBD_STOP_PERCENT - percent_zbd ) * ZATTERA_100_PERCENT ) / ( ZATTERA_ZBD_STOP_PERCENT - ZATTERA_ZBD_START_PERCENT );
+      }
+   });
+} FC_CAPTURE_AND_RETHROW() }
+
+void database::update_signing_witness(const witness_object& signing_witness, const signed_block& new_block)
+{ try {
+   const dynamic_global_property_object& dpo = get_dynamic_global_properties();
+   uint64_t new_block_aslot = dpo.current_aslot + get_slot_at_time( new_block.timestamp );
+
+   modify( signing_witness, [&]( witness_object& _wit )
+   {
+      _wit.last_aslot = new_block_aslot;
+      _wit.last_confirmed_block_num = new_block.block_num();
+   } );
+} FC_CAPTURE_AND_RETHROW() }
+
+void database::update_last_irreversible_block()
+{ try {
+   const dynamic_global_property_object& dpo = get_dynamic_global_properties();
+   auto old_last_irreversible = dpo.last_irreversible_block_num;
+
+   /**
+    * Prior to witness voting taking over, we must be more conservative...
+    */
+   if( head_block_num() < ZATTERA_START_WITNESS_VOTING_BLOCK )
+   {
+      modify( dpo, [&]( dynamic_global_property_object& _dpo )
+      {
+         if ( head_block_num() > ZATTERA_MAX_WITNESSES )
+            _dpo.last_irreversible_block_num = head_block_num() - ZATTERA_MAX_WITNESSES;
+      } );
+   }
+   else
+   {
+      const witness_schedule_object& wso = get_witness_schedule_object();
+
+      vector< const witness_object* > wit_objs;
+      wit_objs.reserve( wso.num_scheduled_witnesses );
+      for( int i = 0; i < wso.num_scheduled_witnesses; i++ )
+         wit_objs.push_back( &get_witness( wso.current_shuffled_witnesses[i] ) );
+
+      static_assert( ZATTERA_IRREVERSIBLE_THRESHOLD > 0, "irreversible threshold must be nonzero" );
+
+      // 1 1 1 2 2 2 2 2 2 2 -> 2     .7*10 = 7
+      // 1 1 1 1 1 1 1 2 2 2 -> 1
+      // 3 3 3 3 3 3 3 3 3 3 -> 3
+
+      size_t offset = ((ZATTERA_100_PERCENT - ZATTERA_IRREVERSIBLE_THRESHOLD) * wit_objs.size() / ZATTERA_100_PERCENT);
+
+      std::nth_element( wit_objs.begin(), wit_objs.begin() + offset, wit_objs.end(),
+         []( const witness_object* a, const witness_object* b )
+         {
+            return a->last_confirmed_block_num < b->last_confirmed_block_num;
+         } );
+
+      uint32_t new_last_irreversible_block_num = wit_objs[offset]->last_confirmed_block_num;
+
+      if( new_last_irreversible_block_num > dpo.last_irreversible_block_num )
+      {
+         modify( dpo, [&]( dynamic_global_property_object& _dpo )
+         {
+            _dpo.last_irreversible_block_num = new_last_irreversible_block_num;
+         } );
+      }
+   }
+
+   commit( dpo.last_irreversible_block_num );
+
+   for( uint32_t i = old_last_irreversible; i <= dpo.last_irreversible_block_num; ++i )
+   {
+      notify_irreversible_block( i );
+   }
+
+   if( !( get_node_properties().skip_flags & skip_block_log ) )
+   {
+      // output to block log based on new last irreverisible block num
+      const auto& tmp_head = _block_log.head();
+      uint64_t log_head_num = 0;
+
+      if( tmp_head )
+         log_head_num = tmp_head->block_num();
+
+      if( log_head_num < dpo.last_irreversible_block_num )
+      {
+         while( log_head_num < dpo.last_irreversible_block_num )
+         {
+            shared_ptr< fork_item > block = _fork_db.fetch_block_on_main_branch_by_number( log_head_num+1 );
+            FC_ASSERT( block, "Current fork in the fork database does not contain the last_irreversible_block" );
+            _block_log.append( block->data );
+            log_head_num++;
+         }
+
+         _block_log.flush();
+      }
+   }
+
+   _fork_db.set_max_size( dpo.head_block_number - dpo.last_irreversible_block_num + 1 );
+} FC_CAPTURE_AND_RETHROW() }
+
+
+bool database::apply_order( const limit_order_object& new_order_object )
+{
+   auto order_id = new_order_object.id;
+
+   const auto& limit_price_idx = get_index<limit_order_index>().indices().get<by_price>();
+
+   auto max_price = ~new_order_object.sell_price;
+   auto limit_itr = limit_price_idx.lower_bound(max_price.max());
+   auto limit_end = limit_price_idx.upper_bound(max_price);
+
+   bool finished = false;
+   while( !finished && limit_itr != limit_end )
+   {
+      auto old_limit_itr = limit_itr;
+      ++limit_itr;
+      // match returns 2 when only the old order was fully filled. In this case, we keep matching; otherwise, we stop.
+      finished = ( match(new_order_object, *old_limit_itr, old_limit_itr->sell_price) & 0x1 );
+   }
+
+   return find< limit_order_object >( order_id ) == nullptr;
+}
+
+int database::match( const limit_order_object& new_order, const limit_order_object& old_order, const price& match_price )
+{
+   ZATTERA_ASSERT( new_order.sell_price.quote.symbol == old_order.sell_price.base.symbol,
+      order_match_exception, "error matching orders: ${new_order} ${old_order} ${match_price}",
+      ("new_order", new_order)("old_order", old_order)("match_price", match_price) );
+   ZATTERA_ASSERT( new_order.sell_price.base.symbol  == old_order.sell_price.quote.symbol,
+      order_match_exception, "error matching orders: ${new_order} ${old_order} ${match_price}",
+      ("new_order", new_order)("old_order", old_order)("match_price", match_price) );
+   ZATTERA_ASSERT( new_order.for_sale > 0 && old_order.for_sale > 0,
+      order_match_exception, "error matching orders: ${new_order} ${old_order} ${match_price}",
+      ("new_order", new_order)("old_order", old_order)("match_price", match_price) );
+   ZATTERA_ASSERT( match_price.quote.symbol == new_order.sell_price.base.symbol,
+      order_match_exception, "error matching orders: ${new_order} ${old_order} ${match_price}",
+      ("new_order", new_order)("old_order", old_order)("match_price", match_price) );
+   ZATTERA_ASSERT( match_price.base.symbol == old_order.sell_price.base.symbol,
+      order_match_exception, "error matching orders: ${new_order} ${old_order} ${match_price}",
+      ("new_order", new_order)("old_order", old_order)("match_price", match_price) );
+
+   auto new_order_for_sale = new_order.amount_for_sale();
+   auto old_order_for_sale = old_order.amount_for_sale();
+
+   asset new_order_pays, new_order_receives, old_order_pays, old_order_receives;
+
+   if( new_order_for_sale <= old_order_for_sale * match_price )
+   {
+      old_order_receives = new_order_for_sale;
+      new_order_receives  = new_order_for_sale * match_price;
+   }
+   else
+   {
+      //This line once read: assert( old_order_for_sale < new_order_for_sale * match_price );
+      //This assert is not always true -- see trade_amount_equals_zero in operation_tests.cpp
+      //Although new_order_for_sale is greater than old_order_for_sale * match_price, old_order_for_sale == new_order_for_sale * match_price
+      //Removing the assert seems to be safe -- apparently no asset is created or destroyed.
+      new_order_receives = old_order_for_sale;
+      old_order_receives = old_order_for_sale * match_price;
+   }
+
+   old_order_pays = new_order_receives;
+   new_order_pays = old_order_receives;
+
+   ZATTERA_ASSERT( new_order_pays == new_order.amount_for_sale() ||
+                 old_order_pays == old_order.amount_for_sale(),
+      order_match_exception, "error matching orders: ${new_order} ${old_order} ${match_price}",
+      ("new_order", new_order)("old_order", old_order)("match_price", match_price) );
+
+   push_virtual_operation( fill_order_operation( new_order.seller, new_order.orderid, new_order_pays, old_order.seller, old_order.orderid, old_order_pays ) );
+
+   int result = 0;
+   result |= fill_order( new_order, new_order_pays, new_order_receives );
+   result |= fill_order( old_order, old_order_pays, old_order_receives ) << 1;
+
+   ZATTERA_ASSERT( result != 0,
+      order_match_exception, "error matching orders: ${new_order} ${old_order} ${match_price}",
+      ("new_order", new_order)("old_order", old_order)("match_price", match_price) );
+   return result;
+}
+
+
+
+
+bool database::fill_order( const limit_order_object& order, const asset& pays, const asset& receives )
+{
+   try
+   {
+      ZATTERA_ASSERT( order.amount_for_sale().symbol == pays.symbol,
+         order_fill_exception, "error filling orders: ${order} ${pays} ${receives}",
+         ("order", order)("pays", pays)("receives", receives) );
+      ZATTERA_ASSERT( pays.symbol != receives.symbol,
+         order_fill_exception, "error filling orders: ${order} ${pays} ${receives}",
+         ("order", order)("pays", pays)("receives", receives) );
+
+      adjust_balance( order.seller, receives );
+
+      if( pays == order.amount_for_sale() )
+      {
+         remove( order );
+         return true;
+      }
+      else
+      {
+         ZATTERA_ASSERT( pays < order.amount_for_sale(),
+           order_fill_exception, "error filling orders: ${order} ${pays} ${receives}",
+           ("order", order)("pays", pays)("receives", receives) );
+
+         modify( order, [&]( limit_order_object& b )
+         {
+            b.for_sale -= pays.amount;
+         } );
+         /**
+          *  There are times when the AMOUNT_FOR_SALE * SALE_PRICE == 0 which means that we
+          *  have hit the limit where the seller is asking for nothing in return.  When this
+          *  happens we must refund any balance back to the seller, it is too small to be
+          *  sold at the sale price.
+          */
+         if( order.amount_to_receive().amount == 0 )
+         {
+            cancel_order(order);
+            return true;
+         }
+         return false;
+      }
+   }
+   FC_CAPTURE_AND_RETHROW( (order)(pays)(receives) )
+}
+
+void database::cancel_order( const limit_order_object& order )
+{
+   adjust_balance( order.seller, order.amount_for_sale() );
+   remove(order);
+}
+
+
+void database::clear_expired_transactions()
+{
+   //Look for expired transactions in the deduplication list, and remove them.
+   //Transactions must have expired by at least two forking windows in order to be removed.
+   auto& transaction_idx = get_index< transaction_index >();
+   const auto& dedupe_index = transaction_idx.indices().get< by_expiration >();
+   while( ( !dedupe_index.empty() ) && ( head_block_time() > dedupe_index.begin()->expiration ) )
+      remove( *dedupe_index.begin() );
+}
+
+void database::clear_expired_orders()
+{
+   auto now = head_block_time();
+   const auto& orders_by_exp = get_index<limit_order_index>().indices().get<by_expiration>();
+   auto itr = orders_by_exp.begin();
+   while( itr != orders_by_exp.end() && itr->expiration < now )
+   {
+      cancel_order( *itr );
+      itr = orders_by_exp.begin();
+   }
+}
+
+void database::clear_expired_delegations()
+{
+   auto now = head_block_time();
+   const auto& delegations_by_exp = get_index< vesting_delegation_expiration_index, by_expiration >();
+   auto itr = delegations_by_exp.begin();
+   while( itr != delegations_by_exp.end() && itr->expiration < now )
+   {
+      modify( get_account( itr->delegator ), [&]( account_object& a )
+      {
+         a.delegated_vesting_shares -= itr->vesting_shares;
+      });
+
+      push_virtual_operation( return_vesting_delegation_operation( itr->delegator, itr->vesting_shares ) );
+
+      remove( *itr );
+      itr = delegations_by_exp.begin();
+   }
+}
+
+void database::modify_balance( const account_object& a, const asset& delta, bool check_balance )
+{
+   modify( a, [&]( account_object& acnt )
+   {
+      switch( delta.symbol.asset_num )
+      {
+         case ZATTERA_ASSET_NUM_ZTR:
+            acnt.balance += delta;
+            if( check_balance )
+            {
+               FC_ASSERT( acnt.balance.amount.value >= 0, "Insufficient ZTR funds" );
+            }
+            break;
+         case ZATTERA_ASSET_NUM_ZBD:
+            if( a.zbd_seconds_last_update != head_block_time() )
+            {
+               acnt.zbd_seconds += fc::uint128_t(a.zbd_balance.amount.value) * (head_block_time() - a.zbd_seconds_last_update).to_seconds();
+               acnt.zbd_seconds_last_update = head_block_time();
+
+               if( acnt.zbd_seconds > 0 &&
+                   (acnt.zbd_seconds_last_update - acnt.zbd_last_interest_payment).to_seconds() > ZATTERA_ZBD_INTEREST_COMPOUND_INTERVAL_SEC )
+               {
+                  auto interest = acnt.zbd_seconds / ZATTERA_SECONDS_PER_YEAR;
+                  interest *= get_dynamic_global_properties().zbd_interest_rate;
+                  interest /= ZATTERA_100_PERCENT;
+                  asset interest_paid(interest.to_uint64(), ZBD_SYMBOL);
+                  acnt.zbd_balance += interest_paid;
+                  acnt.zbd_seconds = 0;
+                  acnt.zbd_last_interest_payment = head_block_time();
+
+                  if(interest > 0)
+                     push_virtual_operation( interest_operation( a.name, interest_paid ) );
+
+                  modify( get_dynamic_global_properties(), [&]( dynamic_global_property_object& props)
+                  {
+                     props.current_zbd_supply += interest_paid;
+                     props.virtual_supply += interest_paid * get_feed_history().current_median_history;
+                  } );
+               }
+            }
+            acnt.zbd_balance += delta;
+            if( check_balance )
+            {
+               FC_ASSERT( acnt.zbd_balance.amount.value >= 0, "Insufficient ZBD funds" );
+            }
+            break;
+         case ZATTERA_ASSET_NUM_VESTS:
+            acnt.vesting_shares += delta;
+            if( check_balance )
+            {
+               FC_ASSERT( acnt.vesting_shares.amount.value >= 0, "Insufficient VESTS funds" );
+            }
+            break;
+         default:
+            FC_ASSERT( false, "invalid symbol" );
+      }
+   } );
+}
+
+void database::modify_reward_balance( const account_object& a, const asset& value_delta, const asset& share_delta, bool check_balance )
+{
+   modify( a, [&]( account_object& acnt )
+   {
+      switch( value_delta.symbol.asset_num )
+      {
+         case ZATTERA_ASSET_NUM_ZTR:
+            if( share_delta.amount.value == 0 )
+            {
+               acnt.reward_ztr_balance += value_delta;
+               if( check_balance )
+               {
+                  FC_ASSERT( acnt.reward_ztr_balance.amount.value >= 0, "Insufficient reward ZTR funds" );
+               }
+            }
+            else
+            {
+               acnt.reward_vesting_ztr += value_delta;
+               acnt.reward_vesting_balance += share_delta;
+               if( check_balance )
+               {
+                  FC_ASSERT( acnt.reward_vesting_balance.amount.value >= 0, "Insufficient reward VESTS funds" );
+               }
+            }
+            break;
+         case ZATTERA_ASSET_NUM_ZBD:
+            FC_ASSERT( share_delta.amount.value == 0 );
+            acnt.reward_zbd_balance += value_delta;
+            if( check_balance )
+            {
+               FC_ASSERT( acnt.reward_zbd_balance.amount.value >= 0, "Insufficient reward ZBD funds" );
+            }
+            break;
+         default:
+            FC_ASSERT( false, "invalid symbol" );
+      }
+   });
+}
+
+void database::adjust_balance( const account_object& a, const asset& delta )
+{
+   modify_balance( a, delta, true );
+}
+
+void database::adjust_balance( const account_name_type& name, const asset& delta )
+{
+   const auto& a = get_account( name );
+   modify_balance( a, delta, true );
+}
+
+void database::adjust_savings_balance( const account_object& a, const asset& delta )
+{
+   modify( a, [&]( account_object& acnt )
+   {
+      switch( delta.symbol.asset_num )
+      {
+         case ZATTERA_ASSET_NUM_ZTR:
+            acnt.savings_balance += delta;
+            FC_ASSERT( acnt.savings_balance.amount.value >= 0, "Insufficient savings ZTR funds" );
+            break;
+         case ZATTERA_ASSET_NUM_ZBD:
+            if( a.savings_zbd_seconds_last_update != head_block_time() )
+            {
+               acnt.savings_zbd_seconds += fc::uint128_t(a.savings_zbd_balance.amount.value) * (head_block_time() - a.savings_zbd_seconds_last_update).to_seconds();
+               acnt.savings_zbd_seconds_last_update = head_block_time();
+
+               if( acnt.savings_zbd_seconds > 0 &&
+                   (acnt.savings_zbd_seconds_last_update - acnt.savings_zbd_last_interest_payment).to_seconds() > ZATTERA_ZBD_INTEREST_COMPOUND_INTERVAL_SEC )
+               {
+                  auto interest = acnt.savings_zbd_seconds / ZATTERA_SECONDS_PER_YEAR;
+                  interest *= get_dynamic_global_properties().zbd_interest_rate;
+                  interest /= ZATTERA_100_PERCENT;
+                  asset interest_paid(interest.to_uint64(), ZBD_SYMBOL);
+                  acnt.savings_zbd_balance += interest_paid;
+                  acnt.savings_zbd_seconds = 0;
+                  acnt.savings_zbd_last_interest_payment = head_block_time();
+
+                  if(interest > 0)
+                     push_virtual_operation( interest_operation( a.name, interest_paid ) );
+
+                  modify( get_dynamic_global_properties(), [&]( dynamic_global_property_object& props)
+                  {
+                     props.current_zbd_supply += interest_paid;
+                     props.virtual_supply += interest_paid * get_feed_history().current_median_history;
+                  } );
+               }
+            }
+            acnt.savings_zbd_balance += delta;
+            FC_ASSERT( acnt.savings_zbd_balance.amount.value >= 0, "Insufficient savings ZBD funds" );
+            break;
+         default:
+            FC_ASSERT( !"invalid symbol" );
+      }
+   } );
+}
+
+void database::adjust_reward_balance( const account_object& a, const asset& value_delta,
+                                      const asset& share_delta /*= asset(0,VESTS_SYMBOL)*/ )
+{
+   FC_ASSERT( value_delta.symbol.is_vesting() == false && share_delta.symbol.is_vesting() );
+
+   modify_reward_balance(a, value_delta, share_delta, true);
+}
+
+void database::adjust_reward_balance( const account_name_type& name, const asset& value_delta,
+                                      const asset& share_delta /*= asset(0,VESTS_SYMBOL)*/ )
+{
+   FC_ASSERT( value_delta.symbol.is_vesting() == false && share_delta.symbol.is_vesting() );
+
+   const auto& a = get_account( name );
+   modify_reward_balance(a, value_delta, share_delta, true);
+}
+
+void database::adjust_supply( const asset& delta, bool adjust_vesting )
+{
+   const auto& props = get_dynamic_global_properties();
+   if( props.head_block_number < ZATTERA_BLOCKS_PER_DAY*7 )
+      adjust_vesting = false;
+
+   modify( props, [&]( dynamic_global_property_object& props )
+   {
+      switch( delta.symbol.asset_num )
+      {
+         case ZATTERA_ASSET_NUM_ZTR:
+         {
+            asset new_vesting( (adjust_vesting && delta.amount > 0) ? delta.amount * 9 : 0, ZTR_SYMBOL );
+            props.current_supply += delta + new_vesting;
+            props.virtual_supply += delta + new_vesting;
+            props.total_vesting_fund_ztr += new_vesting;
+            FC_ASSERT( props.current_supply.amount.value >= 0 );
+            break;
+         }
+         case ZATTERA_ASSET_NUM_ZBD:
+            props.current_zbd_supply += delta;
+            props.virtual_supply = props.current_zbd_supply * get_feed_history().current_median_history + props.current_supply;
+            FC_ASSERT( props.current_zbd_supply.amount.value >= 0 );
+            break;
+         default:
+            FC_ASSERT( false, "invalid symbol" );
+      }
+   } );
+}
+
+
+asset database::get_balance( const account_object& a, asset_symbol_type symbol )const
+{
+   switch( symbol.asset_num )
+   {
+      case ZATTERA_ASSET_NUM_ZTR:
+         return a.balance;
+      case ZATTERA_ASSET_NUM_ZBD:
+         return a.zbd_balance;
+      default:
+         FC_ASSERT( false, "invalid symbol" );
+   }
+}
+
+asset database::get_savings_balance( const account_object& a, asset_symbol_type symbol )const
+{
+   switch( symbol.asset_num )
+   {
+      case ZATTERA_ASSET_NUM_ZTR:
+         return a.savings_balance;
+      case ZATTERA_ASSET_NUM_ZBD:
+         return a.savings_zbd_balance;
+      default: // Note no savings balance for SMT per comments in issue 1682.
+         FC_ASSERT( !"invalid symbol" );
+   }
+}
+
+void database::init_hardforks()
+{
+   // Initialize Genesis hardfork (HF 0)
+   _hardfork_times[ 0 ] = fc::time_point_sec( ZATTERA_GENESIS_TIME );
+   _hardfork_versions[ 0 ] = hardfork_version( 0, 0 );
+
+   // Validate hardfork configuration
+   const auto& hardforks = get_hardfork_property_object();
+   FC_ASSERT( hardforks.last_hardfork <= ZATTERA_NUM_HARDFORKS, "Chain knows of more hardforks than configuration", ("hardforks.last_hardfork",hardforks.last_hardfork)("ZATTERA_NUM_HARDFORKS",ZATTERA_NUM_HARDFORKS) );
+   FC_ASSERT( _hardfork_versions[ hardforks.last_hardfork ] <= ZATTERA_BLOCKCHAIN_VERSION, "Blockchain version is older than last applied hardfork" );
+   FC_ASSERT( ZATTERA_BLOCKCHAIN_HARDFORK_VERSION >= ZATTERA_BLOCKCHAIN_VERSION );
+   FC_ASSERT( ZATTERA_BLOCKCHAIN_HARDFORK_VERSION == _hardfork_versions[ ZATTERA_NUM_HARDFORKS ] );
+}
+
+void database::process_hardforks()
+{
+   try
+   {
+      // If there are upcoming hardforks and the next one is later, do nothing
+      const auto& hardforks = get_hardfork_property_object();
+
+      while( _hardfork_versions[ hardforks.last_hardfork ] < hardforks.next_hardfork
+         && hardforks.next_hardfork_time <= head_block_time() )
+      {
+         if( hardforks.last_hardfork < ZATTERA_NUM_HARDFORKS ) {
+            apply_hardfork( hardforks.last_hardfork + 1 );
+         }
+         else
+            throw unknown_hardfork_exception();
+      }
+   }
+   FC_CAPTURE_AND_RETHROW()
+}
+
+bool database::has_hardfork( uint32_t hardfork )const
+{
+   return get_hardfork_property_object().processed_hardforks.size() > hardfork;
+}
+
+uint32_t database::get_hardfork()const
+{
+   return get_hardfork_property_object().processed_hardforks.size() - 1;
+}
+
+void database::set_hardfork( uint32_t hardfork, bool apply_now )
+{
+   auto const& hardforks = get_hardfork_property_object();
+
+   for( uint32_t i = hardforks.last_hardfork + 1; i <= hardfork && i <= ZATTERA_NUM_HARDFORKS; i++ )
+   {
+      modify( hardforks, [&]( hardfork_property_object& hpo )
+      {
+         hpo.next_hardfork = _hardfork_versions[i];
+         hpo.next_hardfork_time = head_block_time();
+      } );
+
+      if( apply_now )
+         apply_hardfork( i );
+   }
+}
+
+void database::apply_hardfork( uint32_t hardfork )
+{
+   if( _log_hardforks )
+      elog( "HARDFORK ${hf} at block ${b}", ("hf", hardfork)("b", head_block_num()) );
+
+   modify( get_hardfork_property_object(), [&]( hardfork_property_object& hfp )
+   {
+      FC_ASSERT( hardfork == hfp.last_hardfork + 1, "Hardfork being applied out of order", ("hardfork",hardfork)("hfp.last_hardfork",hfp.last_hardfork) );
+      FC_ASSERT( hfp.processed_hardforks.size() == hardfork, "Hardfork being applied out of order" );
+      hfp.processed_hardforks.push_back( _hardfork_times[ hardfork ] );
+      hfp.last_hardfork = hardfork;
+      hfp.current_hardfork_version = _hardfork_versions[ hardfork ];
+      FC_ASSERT( hfp.processed_hardforks[ hfp.last_hardfork ] == _hardfork_times[ hfp.last_hardfork ], "Hardfork processing failed sanity check..." );
+   } );
+
+   push_virtual_operation( hardfork_operation( hardfork ), true );
+}
+
+/**
+ * Verifies all supply invariantes check out
+ */
+void database::validate_invariants()const
+{
+   try
+   {
+      const auto& account_idx = get_index<account_index>().indices().get<by_name>();
+      asset total_supply = asset( 0, ZTR_SYMBOL );
+      asset total_zbd = asset( 0, ZBD_SYMBOL );
+      asset total_vesting = asset( 0, VESTS_SYMBOL );
+      asset pending_vesting_ztr = asset( 0, ZTR_SYMBOL );
+      share_type total_vsf_votes = share_type( 0 );
+
+      auto gpo = get_dynamic_global_properties();
+
+      /// verify no witness has too many votes
+      const auto& witness_idx = get_index< witness_index >().indices();
+      for( auto itr = witness_idx.begin(); itr != witness_idx.end(); ++itr )
+         FC_ASSERT( itr->votes <= gpo.total_vesting_shares.amount, "", ("itr",*itr) );
+
+      for( auto itr = account_idx.begin(); itr != account_idx.end(); ++itr )
+      {
+         total_supply += itr->balance;
+         total_supply += itr->savings_balance;
+         total_supply += itr->reward_ztr_balance;
+         total_zbd += itr->zbd_balance;
+         total_zbd += itr->savings_zbd_balance;
+         total_zbd += itr->reward_zbd_balance;
+         total_vesting += itr->vesting_shares;
+         total_vesting += itr->reward_vesting_balance;
+         pending_vesting_ztr += itr->reward_vesting_ztr;
+         total_vsf_votes += ( itr->proxy == ZATTERA_PROXY_TO_SELF_ACCOUNT ?
+                                 itr->witness_vote_weight() :
+                                 ( ZATTERA_MAX_PROXY_RECURSION_DEPTH > 0 ?
+                                      itr->proxied_vsf_votes[ZATTERA_MAX_PROXY_RECURSION_DEPTH - 1] :
+                                      itr->vesting_shares.amount ) );
+      }
+
+      const auto& convert_request_idx = get_index< convert_request_index >().indices();
+
+      for( auto itr = convert_request_idx.begin(); itr != convert_request_idx.end(); ++itr )
+      {
+         if( itr->amount.symbol == ZTR_SYMBOL )
+            total_supply += itr->amount;
+         else if( itr->amount.symbol == ZBD_SYMBOL )
+            total_zbd += itr->amount;
+         else
+            FC_ASSERT( false, "Encountered illegal symbol in convert_request_object" );
+      }
+
+      const auto& limit_order_idx = get_index< limit_order_index >().indices();
+
+      for( auto itr = limit_order_idx.begin(); itr != limit_order_idx.end(); ++itr )
+      {
+         if( itr->sell_price.base.symbol == ZTR_SYMBOL )
+         {
+            total_supply += asset( itr->for_sale, ZTR_SYMBOL );
+         }
+         else if ( itr->sell_price.base.symbol == ZBD_SYMBOL )
+         {
+            total_zbd += asset( itr->for_sale, ZBD_SYMBOL );
+         }
+      }
+
+      const auto& escrow_idx = get_index< escrow_index >().indices().get< by_id >();
+
+      for( auto itr = escrow_idx.begin(); itr != escrow_idx.end(); ++itr )
+      {
+         total_supply += itr->ztr_balance;
+         total_zbd += itr->zbd_balance;
+
+         if( itr->pending_fee.symbol == ZTR_SYMBOL )
+            total_supply += itr->pending_fee;
+         else if( itr->pending_fee.symbol == ZBD_SYMBOL )
+            total_zbd += itr->pending_fee;
+         else
+            FC_ASSERT( false, "found escrow pending fee that is not ZBD or ZTR" );
+      }
+
+      const auto& savings_withdraw_idx = get_index< savings_withdraw_index >().indices().get< by_id >();
+
+      for( auto itr = savings_withdraw_idx.begin(); itr != savings_withdraw_idx.end(); ++itr )
+      {
+         if( itr->amount.symbol == ZTR_SYMBOL )
+            total_supply += itr->amount;
+         else if( itr->amount.symbol == ZBD_SYMBOL )
+            total_zbd += itr->amount;
+         else
+            FC_ASSERT( false, "found savings withdraw that is not ZBD or ZTR" );
+      }
+
+      const auto& reward_idx = get_index< reward_fund_index, by_id >();
+
+      for( auto itr = reward_idx.begin(); itr != reward_idx.end(); ++itr )
+      {
+         total_supply += itr->reward_balance;
+      }
+
+      total_supply += gpo.total_vesting_fund_ztr + gpo.total_reward_fund_ztr + gpo.pending_rewarded_vesting_ztr;
+
+      FC_ASSERT( gpo.current_supply == total_supply, "", ("gpo.current_supply",gpo.current_supply)("total_supply",total_supply) );
+      FC_ASSERT( gpo.current_zbd_supply == total_zbd, "", ("gpo.current_zbd_supply",gpo.current_zbd_supply)("total_zbd",total_zbd) );
+      FC_ASSERT( gpo.total_vesting_shares + gpo.pending_rewarded_vesting_shares == total_vesting, "", ("gpo.total_vesting_shares",gpo.total_vesting_shares)("total_vesting",total_vesting) );
+      FC_ASSERT( gpo.total_vesting_shares.amount == total_vsf_votes, "", ("total_vesting_shares",gpo.total_vesting_shares)("total_vsf_votes",total_vsf_votes) );
+      FC_ASSERT( gpo.pending_rewarded_vesting_ztr == pending_vesting_ztr, "", ("pending_rewarded_vesting_ztr",gpo.pending_rewarded_vesting_ztr)("pending_vesting_ztr", pending_vesting_ztr));
+
+      FC_ASSERT( gpo.virtual_supply >= gpo.current_supply );
+      if ( !get_feed_history().current_median_history.is_null() )
+      {
+         FC_ASSERT( gpo.current_zbd_supply * get_feed_history().current_median_history + gpo.current_supply
+            == gpo.virtual_supply, "", ("gpo.current_zbd_supply",gpo.current_zbd_supply)("get_feed_history().current_median_history",get_feed_history().current_median_history)("gpo.current_supply",gpo.current_supply)("gpo.virtual_supply",gpo.virtual_supply) );
+      }
+   }
+   FC_CAPTURE_LOG_AND_RETHROW( (head_block_num()) );
+}
+
+void database::retally_comment_children()
+{
+   const auto& cidx = get_index< comment_index >().indices();
+
+   // Clear children counts
+   for( auto itr = cidx.begin(); itr != cidx.end(); ++itr )
+   {
+      modify( *itr, [&]( comment_object& c )
+      {
+         c.children = 0;
+      });
+   }
+
+   for( auto itr = cidx.begin(); itr != cidx.end(); ++itr )
+   {
+      if( itr->parent_author != ZATTERA_ROOT_POST_PARENT )
+      {
+// Low memory nodes only need immediate child count, full nodes track total children
+#ifdef IS_LOW_MEM
+         modify( get_comment( itr->parent_author, itr->parent_permlink ), [&]( comment_object& c )
+         {
+            c.children++;
+         });
+#else
+         const comment_object* parent = &get_comment( itr->parent_author, itr->parent_permlink );
+         while( parent )
+         {
+            modify( *parent, [&]( comment_object& c )
+            {
+               c.children++;
+            });
+
+            if( parent->parent_author != ZATTERA_ROOT_POST_PARENT )
+               parent = &get_comment( parent->parent_author, parent->parent_permlink );
+            else
+               parent = nullptr;
+         }
+#endif
+      }
+   }
+}
+
+void database::retally_witness_votes()
+{
+   const auto& witness_idx = get_index< witness_index >().indices();
+
+   // Clear all witness votes
+   for( auto itr = witness_idx.begin(); itr != witness_idx.end(); ++itr )
+   {
+      modify( *itr, [&]( witness_object& w )
+      {
+         w.votes = 0;
+         w.virtual_position = 0;
+      } );
+   }
+
+   const auto& account_idx = get_index< account_index >().indices();
+
+   // Apply all existing votes by account
+   for( auto itr = account_idx.begin(); itr != account_idx.end(); ++itr )
+   {
+      if( itr->proxy != ZATTERA_PROXY_TO_SELF_ACCOUNT ) continue;
+
+      const auto& a = *itr;
+
+      const auto& vidx = get_index<witness_vote_index>().indices().get<by_account_witness>();
+      auto wit_itr = vidx.lower_bound( boost::make_tuple( a.name, account_name_type() ) );
+      while( wit_itr != vidx.end() && wit_itr->account == a.name )
+      {
+         adjust_witness_vote( get< witness_object, by_name >(wit_itr->witness), a.witness_vote_weight() );
+         ++wit_itr;
+      }
+   }
+}
+
+void database::retally_witness_vote_counts( bool force )
+{
+   const auto& account_idx = get_index< account_index >().indices();
+
+   // Check all existing votes by account
+   for( auto itr = account_idx.begin(); itr != account_idx.end(); ++itr )
+   {
+      const auto& a = *itr;
+      uint16_t witnesses_voted_for = 0;
+      if( force || (a.proxy != ZATTERA_PROXY_TO_SELF_ACCOUNT  ) )
+      {
+        const auto& vidx = get_index< witness_vote_index >().indices().get< by_account_witness >();
+        auto wit_itr = vidx.lower_bound( boost::make_tuple( a.name, account_name_type() ) );
+        while( wit_itr != vidx.end() && wit_itr->account == a.name )
+        {
+           ++witnesses_voted_for;
+           ++wit_itr;
+        }
+      }
+      if( a.witnesses_voted_for != witnesses_voted_for )
+      {
+         modify( a, [&]( account_object& account )
+         {
+            account.witnesses_voted_for = witnesses_voted_for;
+         } );
+      }
+   }
+}
+
+} } //zattera::chain

@@ -1,0 +1,139 @@
+#!/bin/bash
+
+VERSION=`cat /etc/zatterad-version`
+
+if [[ "$ZATTERAD_NODE_MODE" != "testnet" ]]; then
+  if [[ "$USE_HIGH_MEMORY" ]]; then
+    ZATTERAD="/usr/local/zatterad-high/bin/zatterad"
+  else
+    ZATTERAD="/usr/local/zatterad-low/bin/zatterad"
+  fi
+else
+  ZATTERAD="/usr/local/zatterad-test/bin/zatterad"
+fi
+
+# copy config from image if user hasn't provided their own
+if [[ ! -f "$HOME/config.ini" ]]; then
+  if [[ "$ZATTERAD_NODE_MODE" == "fullnode" ]]; then
+    cp /etc/zatterad/fullnode.config.ini $HOME/config.ini
+  elif [[ "$ZATTERAD_NODE_MODE" == "broadcast" ]]; then
+    cp /etc/zatterad/broadcast.config.ini $HOME/config.ini
+  elif [[ "$ZATTERAD_NODE_MODE" == "ahnode" ]]; then
+    cp /etc/zatterad/ahnode.config.ini $HOME/config.ini
+  elif [[ "$ZATTERAD_NODE_MODE" == "witness" ]]; then
+    cp /etc/zatterad/witness.config.ini $HOME/config.ini
+  elif [[ "$ZATTERAD_NODE_MODE" == "testnet" ]]; then
+    cp /etc/zatterad/testnet.config.ini $HOME/config.ini
+  elif [[ -f "/etc/zatterad/config.ini" ]]; then
+    cp /etc/zatterad/config.ini $HOME/config.ini
+  else
+    cp /etc/zatterad/fullnode.config.ini $HOME/config.ini
+  fi
+fi
+
+chown -R zatterad:zatterad $HOME
+
+ARGS=""
+
+# if user did pass in desired seed nodes, use the ones the user specified
+if [[ ! -z "$ZATTERAD_SEED_NODES" ]]; then
+    for NODE in $ZATTERAD_SEED_NODES ; do
+        ARGS+=" --p2p-seed-node=$NODE"
+    done
+fi
+
+if [[ ! -z "$ZATTERAD_WITNESS_NAME" ]]; then
+    ARGS+=" --witness=\"$ZATTERAD_WITNESS_NAME\""
+fi
+
+if [[ ! -z "$ZATTERAD_PRIVATE_KEY" ]]; then
+    ARGS+=" --private-key=$ZATTERAD_PRIVATE_KEY"
+fi
+
+if [[ ! -z "$ZATTERAD_TRACK_ACCOUNT" ]]; then
+    if [[ "$USE_HIGH_MEMORY" ]]; then
+        ARGS+=" --plugin=account_history --plugin=account_history_api"
+        ARGS+=" --account-history-track-account-range=[\"$ZATTERAD_TRACK_ACCOUNT\",\"$ZATTERAD_TRACK_ACCOUNT\"]"
+    else
+        ARGS+=" --plugin=account_history_rocksdb --plugin=account_history_api"
+        ARGS+=" --account-history-rocksdb-track-account-range=[\"$ZATTERAD_TRACK_ACCOUNT\",\"$ZATTERAD_TRACK_ACCOUNT\"]"
+    fi
+fi
+
+if [[ ! "$DISABLE_SHARED_MEMORY_SCALING" ]]; then
+   ARGS+=" --shared-file-full-threshold=9500 --shared-file-scale-rate=1000"
+fi
+
+NOW=`date +%s`
+
+ZATTERAD_FEED_START_TIME=`expr $NOW - 1209600`
+ARGS+=" --follow-start-feeds=$ZATTERAD_FEED_START_TIME"
+
+if [[ ! -d $HOME/blockchain ]]; then
+    if [[ -e /var/cache/zatterad/blocks.tbz2 ]]; then
+        # init with blockchain cached in image
+        ARGS+=" --replay-blockchain"
+        mkdir -p $HOME/blockchain/database
+        cd $HOME/blockchain/database
+        tar xvjpf /var/cache/zatterad/blocks.tbz2
+        chown -R zatterad:zatterad $HOME/blockchain
+    fi
+else
+   ARGS+=" --tags-skip-startup-update"
+fi
+
+# without --data-dir it uses cwd as datadir(!)
+# who knows what else it dumps into current dir
+cd $HOME
+
+if [[ "$USE_PUBLIC_SHARED_MEMORY" ]]; then
+  echo [zatterad][INFO] Downloading and uncompressing blockchain-$VERSION-latest.tar.lz4 - this may take awhile.
+  wget -qO- https://s3.amazonaws.com/zattera-dev-blockchainstate/blockchain-$VERSION-latest.tar.lz4 | lz4 -d | tar x
+fi
+
+if [[ "$USE_PUBLIC_BLOCKLOG" ]]; then
+  if [[ ! -e $HOME/blockchain/block_log ]]; then
+    if [[ ! -d $HOME/blockchain ]]; then
+      mkdir -p $HOME/blockchain
+    fi
+    echo [zatterad][INFO] Downloading a block_log and replaying the blockchain
+    echo "This may take a little while..."
+    wget -O $HOME/blockchain/block_log https://s3.amazonaws.com/zattera-dev-blockchainstate/block_log-latest
+    ARGS+=" --replay-blockchain"
+  fi
+fi
+
+# slow down restart loop if flapping
+sleep 1
+
+mv /etc/nginx/nginx.conf /etc/nginx/nginx.original.conf
+cp /etc/nginx/zatterad.nginx.conf /etc/nginx/nginx.conf
+
+if [[ "$USE_NGINX_PROXY" ]]; then
+    cp /etc/nginx/zatterad-proxy.conf.template /etc/nginx/zatterad-proxy.conf
+    echo server 127.0.0.1:8091\; >> /etc/nginx/zatterad-proxy.conf
+    echo } >> /etc/nginx/zatterad-proxy.conf
+    rm /etc/nginx/sites-enabled/default
+    cp /etc/nginx/zatterad-proxy.conf /etc/nginx/sites-enabled/default
+    /etc/init.d/fcgiwrap restart
+    service nginx restart
+    exec chpst -uzatterad \
+        $ZATTERAD \
+            --webserver-ws-endpoint=0.0.0.0:8091 \
+            --webserver-http-endpoint=0.0.0.0:8091 \
+            --p2p-endpoint=0.0.0.0:2001 \
+            --data-dir=$HOME \
+            $ARGS \
+            $ZATTERAD_EXTRA_OPTS \
+            2>&1
+else
+    exec chpst -uzatterad \
+        $ZATTERAD \
+            --webserver-ws-endpoint=0.0.0.0:8090 \
+            --webserver-http-endpoint=0.0.0.0:8090 \
+            --p2p-endpoint=0.0.0.0:2001 \
+            --data-dir=$HOME \
+            $ARGS \
+            $ZATTERAD_EXTRA_OPTS \
+            2>&1
+fi

@@ -1,0 +1,12 @@
+[submodule "src/base/fc/vendor/diff-match-patch-cpp-stl"]
+	path = src/base/fc/vendor/diff-match-patch-cpp-stl
+	url = https://github.com/leutloff/diff-match-patch-cpp-stl.git
+[submodule "src/base/fc/vendor/secp256k1-zkp"]
+	path = src/base/fc/vendor/secp256k1-zkp
+	url = https://github.com/cryptonomex/secp256k1-zkp.git
+[submodule "src/base/fc/vendor/websocketpp"]
+	path = src/base/fc/vendor/websocketpp
+	url = https://github.com/hanyeol/websocketpp.git
+[submodule "docs/ZEPs"]
+	path = docs/ZEPs
+	url = https://github.com/zattera-protocol/ZEPs.git

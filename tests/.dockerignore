@@ -1,0 +1,12 @@
+smoketest/README.md
+smoketest/Dockerfile
+smoketest/docker_build_and_run.sh
+README.md
+CMakeLists.txt
+db_fixture
+tests
+plugin_tests
+undo_data
+*.cpp
+*.hpp
+__pycache__

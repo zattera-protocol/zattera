@@ -1,0 +1,5 @@
+add_subdirectory( vendor )
+add_subdirectory( base )
+add_subdirectory( core )
+add_subdirectory( plugins )
+add_subdirectory( wallet )

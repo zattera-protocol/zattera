@@ -1,0 +1,6 @@
+add_subdirectory( fc )
+add_subdirectory( schema )
+add_subdirectory( appbase )
+add_subdirectory( net )
+add_subdirectory( utils )
+add_subdirectory( manifest )

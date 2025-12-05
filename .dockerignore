@@ -1,0 +1,41 @@
+# Build directories
+build/
+
+# Document directories
+docs/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Git
+.gitignore
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Logs
+*.log
+
+# Documentation build output
+doxygen/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Pyenv
+.python-version
+
+# AI agents
+AGENTS.md
+CLAUDE.md
+.claude

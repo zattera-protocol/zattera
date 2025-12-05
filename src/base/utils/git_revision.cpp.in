@@ -1,0 +1,14 @@
+#include <stdint.h>
+#include <zattera/utils/git_revision.hpp>
+
+#define ZATTERA_GIT_REVISION_SHA "@ZATTERA_GIT_REVISION_SHA@"
+#define ZATTERA_GIT_REVISION_UNIX_TIMESTAMP @ZATTERA_GIT_REVISION_UNIX_TIMESTAMP@
+#define ZATTERA_GIT_REVISION_DESCRIPTION "@ZATTERA_GIT_REVISION_DESCRIPTION@"
+
+namespace zattera { namespace utilities {
+
+const char* const git_revision_sha = ZATTERA_GIT_REVISION_SHA;
+const uint32_t git_revision_unix_timestamp = ZATTERA_GIT_REVISION_UNIX_TIMESTAMP;
+const char* const git_revision_description = ZATTERA_GIT_REVISION_DESCRIPTION;
+
+} } // end namespace zattera::utilities
