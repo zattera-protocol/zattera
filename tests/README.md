@@ -35,11 +35,11 @@ tests/
 
 ```bash
 cd build
-cmake -DBUILD_ZATTERA_TESTNET=ON -DCMAKE_BUILD_TYPE=Debug ..
+cmake -DBUILD_ZATTERA_TEST_MODE=ON -DCMAKE_BUILD_TYPE=Debug ..
 make -j$(nproc) chain_test plugin_test
 ```
 
-**Note:** Building tests requires `-DBUILD_ZATTERA_TESTNET=ON` flag. Without this flag, tests will fail to build.
+**Note:** Building tests requires `-DBUILD_ZATTERA_TEST_MODE=ON` flag. Without this flag, tests will fail to build.
 
 ### Run All Tests
 
@@ -229,7 +229,7 @@ To generate code coverage reports:
 
 ```bash
 cd build
-cmake -DBUILD_ZATTERA_TESTNET=ON -DENABLE_COVERAGE_TESTING=ON -DCMAKE_BUILD_TYPE=Debug ..
+cmake -DBUILD_ZATTERA_TEST_MODE=ON -DENABLE_COVERAGE_TESTING=ON -DCMAKE_BUILD_TYPE=Debug ..
 make -j$(nproc)
 
 # Capture baseline
@@ -263,7 +263,7 @@ Tests are automatically run in CI on every commit and pull request. Make sure al
 
 ### Common Issues
 
-1. **Tests fail to build:** Make sure you used `-DBUILD_ZATTERA_TESTNET=ON` when running cmake
+1. **Tests fail to build:** Make sure you used `-DBUILD_ZATTERA_TEST_MODE=ON` when running cmake
 2. **Tests timeout:** Increase timeout or run on faster hardware
 3. **Memory issues:** Tests require significant RAM; ensure at least 8GB available
 4. **Parallel test failures:** Some tests may have race conditions; try running sequentially

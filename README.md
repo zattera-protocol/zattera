@@ -86,7 +86,7 @@ See [Building Guide](docs/getting-started/building.md) for detailed instructions
 
 ```bash
 # Build with testnet support
-cmake -DBUILD_ZATTERA_TESTNET=ON -DCMAKE_BUILD_TYPE=Debug ..
+cmake -DBUILD_ZATTERA_TEST_MODE=ON -DCMAKE_BUILD_TYPE=Debug ..
 make -j$(nproc) chain_test plugin_test
 
 # Run tests

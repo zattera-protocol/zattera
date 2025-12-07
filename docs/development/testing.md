@@ -9,26 +9,69 @@ The Zattera test suite uses the [Boost.Test](https://www.boost.org/doc/libs/1_74
 - **`chain_test`** - Core blockchain unit tests
 - **`plugin_test`** - Plugin functionality tests
 
+All tests are designed to run in **Test Mode**, a special build configuration that accelerates blockchain operations and enables testing-specific features.
+
+## Test Mode
+
+### What is Test Mode?
+
+Test Mode is a special build configuration designed exclusively for **local development and unit testing**. When you build with `BUILD_ZATTERA_TEST_MODE=ON`, it enables the `IS_TEST_MODE` compile-time flag, which modifies blockchain parameters to make testing faster and more convenient.
+
+### Test Mode Features
+
+**Accelerated Timing Parameters:**
+- 1-day cashout window (vs 7 days in production)
+- 60-second account recovery period (vs 30 days in production)
+- Faster testing cycles for time-dependent blockchain features
+
+**Development Conveniences:**
+- Free account creation (no minimum fees)
+- No owner authority update restrictions
+- Automatic test key generation from known seeds
+- Pre-funded genesis account: 250M ZTR + 2M ZBD
+- 3M block limit to prevent runaway tests
+
+**Test Compilation:**
+- Unit test suites only compile in Test Mode
+- Special test fixtures and debugging helpers enabled
+
+### When to Use Test Mode
+
+✅ **Use Test Mode for:**
+- Local development and debugging
+- Running unit tests (`chain_test`, `plugin_test`)
+- Quick iterations during feature development
+- Automated CI/CD test runs
+
+❌ **Never use Test Mode for:**
+- Public testnets
+- Production networks
+- Long-running nodes
+- Multi-node test networks
+
+> **Important**: For public testnets, use the default production build with runtime `--chain-id` configuration to create a separate network with production-equivalent parameters.
+
 ## Building Tests
 
-### Prerequisites
+### Build Configuration
 
-Tests require the testnet build configuration:
+Tests **require** Test Mode to compile. Build with `BUILD_ZATTERA_TEST_MODE=ON`:
 
 ```bash
-cmake -DBUILD_ZATTERA_TESTNET=ON -DCMAKE_BUILD_TYPE=Debug ..
+cd build
+cmake -DBUILD_ZATTERA_TEST_MODE=ON -DCMAKE_BUILD_TYPE=Debug ..
 make -j$(nproc) chain_test
 make -j$(nproc) plugin_test
 ```
 
-**Important**: The `BUILD_ZATTERA_TESTNET=ON` flag is **required** for building tests. Without it, the test executables will fail to build.
+**Why Debug mode?** Debug builds include symbols for easier debugging and work well with test fixtures. For performance testing, you can use `Release` mode.
 
 ### Build Targets
 
 **File**: [tests/CMakeLists.txt](../../tests/CMakeLists.txt)
 
-- `chain_test` - Built from all `.cpp` files in `tests/chain/`
-- `plugin_test` - Built from all `.cpp` files in `tests/plugin/`
+- `chain_test` - Core blockchain tests (built from `tests/chain/`)
+- `plugin_test` - Plugin functionality tests (built from `tests/plugin/`)
 - `database_fixture` - Shared test fixture library
 
 ## Running Tests
@@ -529,7 +572,7 @@ sudo apt-get install lcov
 
 ```bash
 # 1. Configure build with coverage enabled
-cmake -DBUILD_ZATTERA_TESTNET=ON \
+cmake -DBUILD_ZATTERA_TEST_MODE=ON \
       -DENABLE_COVERAGE_TESTING=ON \
       -DCMAKE_BUILD_TYPE=Debug \
       ..
@@ -693,7 +736,7 @@ Tests should be run:
 Recommended CI workflow:
 ```bash
 mkdir build && cd build
-cmake -DBUILD_ZATTERA_TESTNET=ON -DCMAKE_BUILD_TYPE=Debug ..
+cmake -DBUILD_ZATTERA_TEST_MODE=ON -DCMAKE_BUILD_TYPE=Debug ..
 make -j$(nproc) chain_test plugin_test
 ./tests/chain_test
 ./tests/plugin_test

@@ -1,4 +1,4 @@
-#ifdef IS_TEST_NET
+#ifdef IS_TEST_MODE
 #include <boost/test/unit_test.hpp>
 
 #include <zattera/protocol/exceptions.hpp>

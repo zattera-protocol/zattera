@@ -10,11 +10,11 @@ fc::variant_object get_config()
 {
    fc::mutable_variant_object result;
 
-#ifdef IS_TEST_NET
-   result[ "IS_TEST_NET" ] = true;
-   result["TESTNET_BLOCK_LIMIT"] = TESTNET_BLOCK_LIMIT;
+#ifdef IS_TEST_MODE
+   result[ "IS_TEST_MODE" ] = true;
+   result["TEST_MODE_BLOCK_LIMIT"] = TEST_MODE_BLOCK_LIMIT;
 #else
-   result[ "IS_TEST_NET" ] = false;
+   result[ "IS_TEST_MODE" ] = false;
 #endif
    result["ZBD_SYMBOL"] = ZBD_SYMBOL;
    result["ZATTERA_INITIAL_VOTE_POWER_RATE"] = ZATTERA_INITIAL_VOTE_POWER_RATE;

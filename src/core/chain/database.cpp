@@ -633,9 +633,9 @@ void database::_maybe_warn_multiple_production( uint32_t height )const
 
 bool database::_push_block(const signed_block& new_block)
 { try {
-   #ifdef IS_TEST_NET
-   FC_ASSERT(new_block.block_num() < TESTNET_BLOCK_LIMIT, "Testnet block limit exceeded");
-   #endif /// IS_TEST_NET
+   #ifdef IS_TEST_MODE
+   FC_ASSERT(new_block.block_num() < TEST_MODE_BLOCK_LIMIT, "Testnet block limit exceeded");
+   #endif /// IS_TEST_MODE
 
    uint32_t skip = get_node_properties().skip_flags;
    //uint32_t skip_undo_db = skip & skip_undo_block;
@@ -958,7 +958,7 @@ inline const void database::push_virtual_operation( const operation& op, bool fo
    /*
    if( !force )
    {
-      #if defined( IS_LOW_MEM ) && ! defined( IS_TEST_NET )
+      #if defined( IS_LOW_MEM ) && ! defined( IS_TEST_MODE )
       return;
       #endif
    }
@@ -2535,7 +2535,7 @@ void database::check_free_memory( bool force_print, uint32_t current_block_num )
       {
          uint32_t free_mb = uint32_t( free_mem / (1024*1024) );
 
-   #ifdef IS_TEST_NET
+   #ifdef IS_TEST_MODE
       if( !disable_low_mem_warning )
    #endif
          if( free_mb <= 100 && head_block_num() % 10 == 0 )
@@ -2799,7 +2799,7 @@ try {
             std::sort( copy.begin(), copy.end() ); /// TODO: use nth_item
             fho.current_median_history = copy[copy.size()/2];
 
-#ifdef IS_TEST_NET
+#ifdef IS_TEST_MODE
             if( skip_price_feed_limit_check )
                return;
 #endif

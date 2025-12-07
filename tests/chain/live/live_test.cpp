@@ -16,7 +16,7 @@ using namespace zattera;
 using namespace zattera::chain;
 using namespace zattera::protocol;
 
-#ifndef IS_TEST_NET
+#ifndef IS_TEST_MODE
 
 BOOST_FIXTURE_TEST_SUITE( live_tests, live_database_fixture )
 

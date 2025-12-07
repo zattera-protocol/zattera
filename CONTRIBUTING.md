@@ -107,7 +107,7 @@ git checkout -b feature/my-feature
 # Build and test
 git submodule update --init --recursive
 mkdir build && cd build
-cmake -DBUILD_ZATTERA_TESTNET=ON -DCMAKE_BUILD_TYPE=Debug ..
+cmake -DBUILD_ZATTERA_TEST_MODE=ON -DCMAKE_BUILD_TYPE=Debug ..
 make -j$(nproc) chain_test plugin_test
 ./tests/chain_test
 ```

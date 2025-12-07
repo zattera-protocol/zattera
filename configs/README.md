@@ -67,7 +67,7 @@ cp configs/fullnode.config.ini witness_node_data_dir/config.ini
 ### 3. Starting a Test Network
 ```bash
 # Requires test network build option
-# cmake -DBUILD_ZATTERA_TESTNET=ON ..
+# cmake -DBUILD_ZATTERA_TEST_MODE=ON ..
 
 cp configs/test.config.ini witness_node_data_dir/config.ini
 ./deploy/zatterad-test-bootstrap.sh

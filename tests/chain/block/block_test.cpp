@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#ifdef IS_TEST_NET
+#ifdef IS_TEST_MODE
 #include <boost/test/unit_test.hpp>
 
 #include <zattera/protocol/exceptions.hpp>

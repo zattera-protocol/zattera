@@ -54,7 +54,7 @@ RUN \
     cd build && \
     cmake \
         -DCMAKE_BUILD_TYPE=Release \
-        -DBUILD_ZATTERA_TESTNET=ON \
+        -DBUILD_ZATTERA_TEST_MODE=ON \
         -DLOW_MEMORY_NODE=OFF \
         -DCLEAR_VOTES=ON \
         -DSKIP_BY_TX_ID=ON \
@@ -79,7 +79,7 @@ RUN \
     cmake \
         -DCMAKE_INSTALL_PREFIX=/usr/local/zatterad-test \
         -DCMAKE_BUILD_TYPE=Release \
-        -DBUILD_ZATTERA_TESTNET=ON \
+        -DBUILD_ZATTERA_TEST_MODE=ON \
         -DLOW_MEMORY_NODE=OFF \
         -DCLEAR_VOTES=ON \
         -DSKIP_BY_TX_ID=ON \
@@ -106,7 +106,7 @@ RUN \
     cmake \
         -DCMAKE_BUILD_TYPE=Debug \
         -DENABLE_COVERAGE_TESTING=ON \
-        -DBUILD_ZATTERA_TESTNET=ON \
+        -DBUILD_ZATTERA_TEST_MODE=ON \
         -DLOW_MEMORY_NODE=OFF \
         -DCLEAR_VOTES=ON \
         -DSKIP_BY_TX_ID=ON \
@@ -132,7 +132,7 @@ RUN \
         -DLOW_MEMORY_NODE=ON \
         -DCLEAR_VOTES=ON \
         -DSKIP_BY_TX_ID=OFF \
-        -DBUILD_ZATTERA_TESTNET=OFF \
+        -DBUILD_ZATTERA_TEST_MODE=OFF \
         -DZATTERA_STATIC_BUILD=${ZATTERA_STATIC_BUILD} \
         .. \
     && \
@@ -155,7 +155,7 @@ RUN \
         -DLOW_MEMORY_NODE=OFF \
         -DCLEAR_VOTES=OFF \
         -DSKIP_BY_TX_ID=ON \
-        -DBUILD_ZATTERA_TESTNET=OFF \
+        -DBUILD_ZATTERA_TEST_MODE=OFF \
         -DZATTERA_STATIC_BUILD=${ZATTERA_STATIC_BUILD} \
         .. \
     && \

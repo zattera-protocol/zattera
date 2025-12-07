@@ -501,7 +501,7 @@ void database_fixture::set_price_feed( const price& new_price )
    set_witness_props( props );
 
    BOOST_REQUIRE(
-#ifdef IS_TEST_NET
+#ifdef IS_TEST_MODE
       !db->skip_price_feed_limit_check ||
 #endif
       db->get(feed_history_id_type()).current_median_history == new_price

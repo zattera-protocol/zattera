@@ -440,7 +440,7 @@ namespace zattera { namespace chain {
          void set_flush_interval( uint32_t flush_blocks );
          void check_free_memory( bool force_print, uint32_t current_block_num );
 
-#ifdef IS_TEST_NET
+#ifdef IS_TEST_MODE
          bool skip_price_feed_limit_check = true;
          bool skip_transaction_delta_check = true;
          bool disable_low_mem_warning = true;

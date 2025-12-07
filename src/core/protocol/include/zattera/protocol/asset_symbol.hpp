@@ -27,7 +27,7 @@
 #define ZATTERA_ASSET_NUM_VESTS \
   (((SMT_MAX_NAI + ZATTERA_NAI_VESTS) << ZATTERA_ASSET_SYMBOL_PRECISION_BITS) | ZATTERA_PRECISION_VESTS)
 
-#ifdef IS_TEST_NET
+#ifdef IS_TEST_MODE
 
 #define VESTS_SYMBOL_U64 (uint64_t('V') | (uint64_t('E') << 8) | (uint64_t('S') << 16) | (uint64_t('T') << 24) | (uint64_t('S') << 32))
 #define ZTR_SYMBOL_U64   (uint64_t('T') | (uint64_t('T') << 8) | (uint64_t('R') << 16))

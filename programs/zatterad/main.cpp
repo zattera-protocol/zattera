@@ -44,9 +44,9 @@ string& version_string()
 
 void info()
 {
-#ifdef IS_TEST_NET
+#ifdef IS_TEST_MODE
       std::cerr << "------------------------------------------------------\n\n";
-      std::cerr << "            STARTING TEST NETWORK\n\n";
+      std::cerr << "            STARTING TEST MODE\n\n";
       std::cerr << "------------------------------------------------------\n";
       auto genesis_private_key = zattera::utilities::key_to_wif( ZATTERA_GENESIS_PRIVATE_KEY );
       std::cerr << "genesis public key: " << ZATTERA_GENESIS_PUBLIC_KEY_STR << "\n";

@@ -69,7 +69,7 @@ private-key = 5K...  # Your witness signing key
   - Network: Stable, low-latency connection
 
 - **Software**:
-  - Build: Standard build (`BUILD_ZATTERA_TESTNET=OFF`)
+  - Build: Standard build (`BUILD_ZATTERA_TEST_MODE=OFF`)
   - OS: Linux (Ubuntu 20.04/22.04 recommended)
 
 ### Use Cases
@@ -391,7 +391,7 @@ webserver-ws-endpoint = 0.0.0.0:8090
 - **Primary function**: Development environment
 - **Memory**: 30GB shared memory
 - **Plugins**: Full plugin set for testing
-- **Build**: Requires `BUILD_ZATTERA_TESTNET=ON`
+- **Build**: Requires `BUILD_ZATTERA_TEST_MODE=ON`
 
 ### Configuration
 
@@ -427,7 +427,7 @@ private-key = 5JNHfZYKGaomSFvd4NUdQ9qMcEAC43kujbfjueTHpVapX1Kzq2n
 ```bash
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release \
-      -DBUILD_ZATTERA_TESTNET=ON \
+      -DBUILD_ZATTERA_TEST_MODE=ON \
       ..
 make -j$(nproc) zatterad
 ```

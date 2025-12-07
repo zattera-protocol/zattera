@@ -8,7 +8,7 @@
 // Every symbol defined here needs to be handled appropriately in get_config.cpp
 // This is checked by get_config_check.sh called from Dockerfile
 
-#ifdef IS_TEST_NET
+#ifdef IS_TEST_MODE
 #define ZATTERA_BLOCKCHAIN_VERSION              ( version(0, 0, 0) )
 
 #define ZATTERA_GENESIS_PRIVATE_KEY             (fc::ecc::private_key::regenerate(fc::sha256::hash(std::string("init_key"))))
@@ -19,7 +19,7 @@
 
 #define ZATTERA_GENESIS_TIME                    (fc::time_point_sec(1451606400))
 #define ZATTERA_CASHOUT_WINDOW_SECONDS          (60*60*24*1) // 1 day
-#define ZATTERA_UPVOTE_LOCKOUT                  (fc::hours(12))
+#define ZATTERA_UPVOTE_LOCKOUT                  (fc::hours(1))  // 1 hour for faster testing
 
 #define ZATTERA_MIN_ACCOUNT_CREATION_FEE        0
 
@@ -32,7 +32,7 @@
 #define ZATTERA_ZBD_INITIAL_SUPPLY              (int64_t( 2 ) * int64_t( 1000000 ) * int64_t( 1000 ))
 
 /// Allows to limit number of total produced blocks.
-#define TESTNET_BLOCK_LIMIT                   (3000000)
+#define TEST_MODE_BLOCK_LIMIT                   (3000000)
 
 #else // IS LIVE ZATTERA NETWORK
 

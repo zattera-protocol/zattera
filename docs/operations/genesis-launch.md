@@ -28,7 +28,7 @@ Build `zatterad` for your target network. For detailed build instructions includ
 ```bash
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release \
-      -DBUILD_ZATTERA_TESTNET=ON \
+      -DBUILD_ZATTERA_TEST_MODE=ON \
       ..
 make -j$(nproc) zatterad
 ```
@@ -38,7 +38,7 @@ make -j$(nproc) zatterad
 ```bash
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release \
-      -DBUILD_ZATTERA_TESTNET=OFF \
+      -DBUILD_ZATTERA_TEST_MODE=OFF \
       ..
 make -j$(nproc) zatterad
 ```
@@ -63,7 +63,7 @@ Genesis parameters are configured at build time in `src/core/protocol/include/za
 
 #### Testnet Configuration
 
-When building with `BUILD_ZATTERA_TESTNET=ON`:
+When building with `BUILD_ZATTERA_TEST_MODE=ON`:
 
 - **Chain ID**: "testnet"
 - **Address Prefix**: "TST"
@@ -76,7 +76,7 @@ When building with `BUILD_ZATTERA_TESTNET=ON`:
 
 #### Mainnet Configuration
 
-For mainnet builds (`BUILD_ZATTERA_TESTNET=OFF`, default):
+For mainnet builds (`BUILD_ZATTERA_TEST_MODE=OFF`, default):
 
 - **Chain ID**: "" (empty)
 - **Address Prefix**: "ZTR"

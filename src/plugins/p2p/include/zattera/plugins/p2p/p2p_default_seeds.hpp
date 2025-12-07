@@ -4,7 +4,7 @@
 
 namespace zattera{ namespace plugins { namespace p2p {
 
-#ifdef IS_TEST_NET
+#ifdef IS_TEST_MODE
 const std::vector< std::string > default_seeds;
 #else
 const std::vector< std::string > default_seeds = {

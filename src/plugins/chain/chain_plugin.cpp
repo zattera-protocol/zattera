@@ -314,7 +314,7 @@ void chain_plugin::set_program_options(options_description& cli, options_descrip
          ("dump-memory-details", bpo::bool_switch()->default_value(false), "Dump database objects memory usage info. Use set-benchmark-interval to set dump interval.")
          ("check-locks", bpo::bool_switch()->default_value(false), "Check correctness of chainbase locking" )
          ("validate-database-invariants", bpo::bool_switch()->default_value(false), "Validate all supply invariants check out" )
-#ifdef IS_TEST_NET
+#ifdef IS_TEST_MODE
          ("chain-id", bpo::value< std::string >()->default_value( ZATTERA_CHAIN_ID_NAME ), "chain ID to connect to")
 #endif
          ;
@@ -372,7 +372,7 @@ void chain_plugin::plugin_initialize(const variables_map& options) {
       my->statsd_on_replay = options.at( "statsd-record-on-replay" ).as< bool >();
    }
 
-#ifdef IS_TEST_NET
+#ifdef IS_TEST_MODE
    if( options.count( "chain-id" ) )
       my->db.set_chain_id( options.at("chain-id").as< std::string >() );
 #endif

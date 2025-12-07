@@ -80,7 +80,7 @@ int main( int argc, char** argv )
          ("daemon,d", "Run the wallet in daemon mode" )
          ("rpc-http-allowip", bpo::value<vector<string>>()->multitoken(), "Allows only specified IPs to connect to the HTTP endpoint" )
          ("wallet-file,w", bpo::value<string>()->implicit_value("wallet.json"), "wallet to load")
-#ifdef IS_TEST_NET
+#ifdef IS_TEST_MODE
          ("chain-id", bpo::value< std::string >()->implicit_value( ZATTERA_CHAIN_ID_NAME ), "chain ID to connect to")
 #endif
          ;
@@ -102,7 +102,7 @@ int main( int argc, char** argv )
 
       zattera::protocol::chain_id_type _zattera_chain_id = ZATTERA_CHAIN_ID;  // Initialize with default
 
-#ifdef IS_TEST_NET
+#ifdef IS_TEST_MODE
       if( options.count("chain-id") )
             _zattera_chain_id = generate_chain_id( options["chain-id"].as< std::string >() );
 #endif
