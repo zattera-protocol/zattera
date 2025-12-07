@@ -48,8 +48,8 @@ void info()
       std::cerr << "------------------------------------------------------\n\n";
       std::cerr << "            STARTING TEST NETWORK\n\n";
       std::cerr << "------------------------------------------------------\n";
-      auto genesis_private_key = zattera::utilities::key_to_wif( ZATTERA_INIT_PRIVATE_KEY );
-      std::cerr << "genesis public key: " << ZATTERA_INIT_PUBLIC_KEY_STR << "\n";
+      auto genesis_private_key = zattera::utilities::key_to_wif( ZATTERA_GENESIS_PRIVATE_KEY );
+      std::cerr << "genesis public key: " << ZATTERA_GENESIS_PUBLIC_KEY_STR << "\n";
       std::cerr << "genesis private key: " << genesis_private_key << "\n";
       std::cerr << "blockchain version: " << fc::string( ZATTERA_BLOCKCHAIN_VERSION ) << "\n";
       std::cerr << "------------------------------------------------------\n";
@@ -57,7 +57,7 @@ void info()
       std::cerr << "------------------------------------------------------\n\n";
       std::cerr << "            STARTING ZATTERA NETWORK\n\n";
       std::cerr << "------------------------------------------------------\n";
-      std::cerr << "genesis public key: " << ZATTERA_INIT_PUBLIC_KEY_STR << "\n";
+      std::cerr << "genesis public key: " << ZATTERA_GENESIS_PUBLIC_KEY_STR << "\n";
       std::cerr << "chain id: " << std::string( ZATTERA_CHAIN_ID ) << "\n";
       std::cerr << "blockchain version: " << fc::string( ZATTERA_BLOCKCHAIN_VERSION ) << "\n";
       std::cerr << "------------------------------------------------------\n";

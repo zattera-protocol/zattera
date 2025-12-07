@@ -889,7 +889,6 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation2 )
       //auto gpo = db->get_dynamic_global_properties();
       //auto start_zbd = gpo.current_zbd_supply;
 
-
       op.owner = "alice";
       op.orderid = 5;
       op.amount_to_sell = ASSET( "20.000 TTR" );
@@ -1270,6 +1269,7 @@ BOOST_AUTO_TEST_CASE( maintain_zbd_stability )
    {
       resize_shared_mem( 1024 * 1024 * 512 ); // Due to number of blocks in the test, it requires a large file. (64 MB)
 
+      auto zbd_initial_supply = db->get_dynamic_global_properties().current_zbd_supply;
       auto debug_key = "5JdouSvkK75TKWrJixYufQgePT21V7BAVWbNUWt3ktqhPmy8Z78"; //get_dev_key debug node
 
       ACTORS( (alice)(bob)(sam)(dave)(greg) );
@@ -1332,8 +1332,8 @@ BOOST_AUTO_TEST_CASE( maintain_zbd_stability )
       {
          db.modify( db.get_dynamic_global_properties(), [&]( dynamic_global_property_object& gpo )
          {
-            gpo.current_zbd_supply = zbd_balance;
-            gpo.virtual_supply = gpo.virtual_supply + zbd_balance * exchange_rate;
+            gpo.current_zbd_supply = zbd_initial_supply + zbd_balance;
+            gpo.virtual_supply += zbd_balance * exchange_rate;
          });
       }, database::skip_witness_signature );
 
@@ -1361,11 +1361,12 @@ BOOST_AUTO_TEST_CASE( maintain_zbd_stability )
       BOOST_TEST_MESSAGE( "Letting percent market cap fall to 2% to verify printing of ZBD turns back on" );
 
       // Get close to 1.5% for printing ZBD to start again, but not all the way
+      asset reduced_zbd_balance = asset( ( 194 * zbd_balance.amount ) / 500, ZBD_SYMBOL );
       db_plugin->debug_update( [=]( database& db )
       {
          db.modify( db.get_account( "sam" ), [&]( account_object& a )
          {
-            a.zbd_balance = asset( ( 194 * zbd_balance.amount ) / 500, ZBD_SYMBOL );
+            a.zbd_balance = reduced_zbd_balance;
          });
       }, database::skip_witness_signature );
 
@@ -1373,7 +1374,7 @@ BOOST_AUTO_TEST_CASE( maintain_zbd_stability )
       {
          db.modify( db.get_dynamic_global_properties(), [&]( dynamic_global_property_object& gpo )
          {
-            gpo.current_zbd_supply = alice_zbd + asset( ( 194 * zbd_balance.amount ) / 500, ZBD_SYMBOL );
+            gpo.current_zbd_supply = zbd_initial_supply + alice_zbd + reduced_zbd_balance;
          });
       }, database::skip_witness_signature );
 

@@ -19,6 +19,7 @@
 #include <iostream>
 
 #define INITIAL_TEST_SUPPLY (10000000000ll)
+#define ZBD_INITIAL_TEST_SUPPLY (20000000ll)
 
 extern uint32_t ZATTERA_TESTING_GENESIS_TIMESTAMP;
 

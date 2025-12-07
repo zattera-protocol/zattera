@@ -104,7 +104,7 @@ namespace zattera {
             friend bool operator != ( const public_key_type& p1, const public_key_type& p2);
       };
 
-      #define ZATTERA_INIT_PUBLIC_KEY (zattera::protocol::public_key_type(ZATTERA_INIT_PUBLIC_KEY_STR))
+      #define ZATTERA_GENESIS_PUBLIC_KEY (zattera::protocol::public_key_type(ZATTERA_GENESIS_PUBLIC_KEY_STR))
 
       struct extended_public_key_type
       {

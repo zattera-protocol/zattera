@@ -11,18 +11,15 @@
 #ifdef IS_TEST_NET
 #define ZATTERA_BLOCKCHAIN_VERSION              ( version(0, 0, 0) )
 
-#define ZATTERA_INIT_PRIVATE_KEY                (fc::ecc::private_key::regenerate(fc::sha256::hash(std::string("init_key"))))
-#define ZATTERA_INIT_PUBLIC_KEY_STR             (std::string( zattera::protocol::public_key_type(ZATTERA_INIT_PRIVATE_KEY.get_public_key()) ))
+#define ZATTERA_GENESIS_PRIVATE_KEY             (fc::ecc::private_key::regenerate(fc::sha256::hash(std::string("init_key"))))
+#define ZATTERA_GENESIS_PUBLIC_KEY_STR          (std::string( zattera::protocol::public_key_type(ZATTERA_GENESIS_PRIVATE_KEY.get_public_key()) ))
 #define ZATTERA_CHAIN_ID_NAME                   "testnet"
 #define ZATTERA_CHAIN_ID                        (fc::sha256::hash(ZATTERA_CHAIN_ID_NAME))
 #define ZATTERA_ADDRESS_PREFIX                  "TST"
 
 #define ZATTERA_GENESIS_TIME                    (fc::time_point_sec(1451606400))
-#define ZATTERA_CASHOUT_WINDOW_SECONDS          (60*60*24*7) // 7 days
-#define ZATTERA_SECOND_CASHOUT_WINDOW           (60*60*24*3) // 3 days
-#define ZATTERA_MAX_CASHOUT_WINDOW_SECONDS      (60*60*24) // 1 day
+#define ZATTERA_CASHOUT_WINDOW_SECONDS          (60*60*24*1) // 1 day
 #define ZATTERA_UPVOTE_LOCKOUT                  (fc::hours(12))
-
 
 #define ZATTERA_MIN_ACCOUNT_CREATION_FEE        0
 
@@ -31,7 +28,8 @@
 #define ZATTERA_OWNER_UPDATE_LIMIT                          fc::seconds(0)
 #define ZATTERA_OWNER_AUTH_HISTORY_TRACKING_START_BLOCK_NUM 1
 
-#define ZATTERA_INIT_SUPPLY                     int64_t(0)
+#define ZATTERA_INITIAL_SUPPLY                  (int64_t( 250 ) * int64_t( 1000000 ) * int64_t( 1000 ))
+#define ZATTERA_ZBD_INITIAL_SUPPLY              (int64_t( 2 ) * int64_t( 1000000 ) * int64_t( 1000 ))
 
 /// Allows to limit number of total produced blocks.
 #define TESTNET_BLOCK_LIMIT                   (3000000)
@@ -40,15 +38,13 @@
 
 #define ZATTERA_BLOCKCHAIN_VERSION              ( version(0, 0, 0) )
 
-#define ZATTERA_INIT_PUBLIC_KEY_STR             "ZTR8GC13uCZbP44HzMLV6zPZGwVQ8Nt4Kji8PapsPiNq1BK153XTX"
+#define ZATTERA_GENESIS_PUBLIC_KEY_STR          "ZTR8GC13uCZbP44HzMLV6zPZGwVQ8Nt4Kji8PapsPiNq1BK153XTX"
 #define ZATTERA_CHAIN_ID_NAME                   ""
 #define ZATTERA_CHAIN_ID                        fc::sha256()
 #define ZATTERA_ADDRESS_PREFIX                  "ZTR"
 
 #define ZATTERA_GENESIS_TIME                    (fc::time_point_sec(1458835200))
 #define ZATTERA_CASHOUT_WINDOW_SECONDS          (60*60*24*7)  // 7 days
-#define ZATTERA_SECOND_CASHOUT_WINDOW           (60*60*24*30) // 30 days
-#define ZATTERA_MAX_CASHOUT_WINDOW_SECONDS      (60*60*24*14) // 2 weeks
 #define ZATTERA_UPVOTE_LOCKOUT                  (fc::hours(12))
 
 #define ZATTERA_MIN_ACCOUNT_CREATION_FEE        1
@@ -58,7 +54,8 @@
 #define ZATTERA_OWNER_UPDATE_LIMIT                          fc::minutes(60)
 #define ZATTERA_OWNER_AUTH_HISTORY_TRACKING_START_BLOCK_NUM 3186477
 
-#define ZATTERA_INIT_SUPPLY                     int64_t(0)
+#define ZATTERA_INITIAL_SUPPLY                  int64_t(0)
+#define ZATTERA_ZBD_INITIAL_SUPPLY              int64_t(0)
 
 #endif
 
