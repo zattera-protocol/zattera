@@ -41,7 +41,7 @@
 #define ZATTERA_CHAIN_ID_NAME                   "zattera"
 #define ZATTERA_ADDRESS_PREFIX                  "ZTR"
 
-#define ZATTERA_GENESIS_TIME                    (fc::time_point_sec(1458835200))
+#define ZATTERA_GENESIS_TIME                    (fc::time_point_sec(1765195200))
 #define ZATTERA_CASHOUT_WINDOW_SECONDS          (60*60*24*7)  // 7 days
 #define ZATTERA_UPVOTE_LOCKOUT                  (fc::hours(12))
 
