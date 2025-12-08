@@ -33,11 +33,11 @@
 /// Allows to limit number of total produced blocks.
 #define TEST_MODE_BLOCK_LIMIT                   (3000000)
 
-#else // IS LIVE ZATTERA NETWORK
+#else // IS LIVE NETWORK (Not Test Mode)
 
 #define ZATTERA_BLOCKCHAIN_VERSION              ( version(0, 0, 0) )
 
-#define ZATTERA_GENESIS_PUBLIC_KEY_STR          "ZTR8GC13uCZbP44HzMLV6zPZGwVQ8Nt4Kji8PapsPiNq1BK153XTX"
+#define ZATTERA_GENESIS_PUBLIC_KEY_STR          "ZTR8MxbBULHYSq5MzAak5KK2pqvB7QdGmmuDqxDY8KDnsdSBM5T4K"
 #define ZATTERA_CHAIN_ID_NAME                   "zattera"
 #define ZATTERA_ADDRESS_PREFIX                  "ZTR"
 
