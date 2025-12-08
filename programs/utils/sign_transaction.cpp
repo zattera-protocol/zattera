@@ -41,9 +41,7 @@ FC_REFLECT( error_result, (error) )
 
 int main(int argc, char** argv, char** envp)
 {
-   fc::sha256 chainId;
-
-   chainId = ZATTERA_CHAIN_ID;
+   fc::sha256 chainId = zattera::protocol::generate_chain_id( ZATTERA_CHAIN_ID_NAME );
 
    const size_t chainIdLen = strlen(CHAIN_ID_PARAM);
 

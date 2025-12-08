@@ -93,14 +93,17 @@ int main( int argc, char** argv )
          std::cout << opts << "\n";
          return 0;
       }
+
       if( options.count("rpc-http-allowip") && options.count("rpc-http-endpoint") ) {
          allowed_ips = options["rpc-http-allowip"].as<vector<string>>();
          wdump((allowed_ips));
       }
 
-      zattera::protocol::chain_id_type chain_id = ZATTERA_CHAIN_ID;  // Initialize with default
+      auto chain_id_name = std::string( ZATTERA_CHAIN_ID_NAME );
       if( options.count("chain-id") )
-            chain_id = generate_chain_id( options["chain-id"].as< std::string >() );
+            chain_id_name = options["chain-id"].as< std::string >();
+
+      zattera::protocol::chain_id_type chain_id = generate_chain_id( chain_id_name );
 
       fc::path data_dir;
       fc::logging_config cfg;

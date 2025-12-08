@@ -14,7 +14,6 @@
 #define ZATTERA_GENESIS_PRIVATE_KEY             (fc::ecc::private_key::regenerate(fc::sha256::hash(std::string("init_key"))))
 #define ZATTERA_GENESIS_PUBLIC_KEY_STR          (std::string( zattera::protocol::public_key_type(ZATTERA_GENESIS_PRIVATE_KEY.get_public_key()) ))
 #define ZATTERA_CHAIN_ID_NAME                   "test"
-#define ZATTERA_CHAIN_ID                        (fc::sha256::hash(ZATTERA_CHAIN_ID_NAME))
 #define ZATTERA_ADDRESS_PREFIX                  "TST"
 
 #define ZATTERA_GENESIS_TIME                    (fc::time_point_sec(1451606400))
@@ -39,8 +38,7 @@
 #define ZATTERA_BLOCKCHAIN_VERSION              ( version(0, 0, 0) )
 
 #define ZATTERA_GENESIS_PUBLIC_KEY_STR          "ZTR8GC13uCZbP44HzMLV6zPZGwVQ8Nt4Kji8PapsPiNq1BK153XTX"
-#define ZATTERA_CHAIN_ID_NAME                   ""
-#define ZATTERA_CHAIN_ID                        fc::sha256()
+#define ZATTERA_CHAIN_ID_NAME                   "zattera"
 #define ZATTERA_ADDRESS_PREFIX                  "ZTR"
 
 #define ZATTERA_GENESIS_TIME                    (fc::time_point_sec(1458835200))

@@ -3,6 +3,7 @@
 
 #include <zattera/protocol/types.hpp>
 #include <zattera/protocol/version.hpp>
+#include <zattera/protocol/runtime_config.hpp>
 
 #include <zattera/utils/logging_config.hpp>
 #include <zattera/utils/key_conversion.hpp>
@@ -51,6 +52,8 @@ void info()
       auto genesis_private_key = zattera::utilities::key_to_wif( ZATTERA_GENESIS_PRIVATE_KEY );
       std::cerr << "genesis public key: " << ZATTERA_GENESIS_PUBLIC_KEY_STR << "\n";
       std::cerr << "genesis private key: " << genesis_private_key << "\n";
+      std::cerr << "chain id: " << zattera::protocol::get_chain_id_name() << "\n";
+      std::cerr << "address prefix: " << zattera::protocol::get_address_prefix() << "\n";
       std::cerr << "blockchain version: " << fc::string( ZATTERA_BLOCKCHAIN_VERSION ) << "\n";
       std::cerr << "------------------------------------------------------\n";
 #else
@@ -58,7 +61,8 @@ void info()
       std::cerr << "            STARTING ZATTERA NETWORK\n\n";
       std::cerr << "------------------------------------------------------\n";
       std::cerr << "genesis public key: " << ZATTERA_GENESIS_PUBLIC_KEY_STR << "\n";
-      std::cerr << "chain id: " << std::string( ZATTERA_CHAIN_ID ) << "\n";
+      std::cerr << "chain id: " << zattera::protocol::get_chain_id_name() << "\n";
+      std::cerr << "address prefix: " << zattera::protocol::get_address_prefix() << "\n";
       std::cerr << "blockchain version: " << fc::string( ZATTERA_BLOCKCHAIN_VERSION ) << "\n";
       std::cerr << "------------------------------------------------------\n";
 #endif

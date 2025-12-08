@@ -1,11 +1,11 @@
 #include <zattera/protocol/runtime_config.hpp>
 #include <zattera/protocol/config.hpp>
-#include <fc/crypto/sha256.hpp>
+#include <zattera/protocol/types.hpp>
 
 namespace zattera { namespace protocol {
 
    static runtime_config_data _config = {
-      fc::sha256::hash( ZATTERA_CHAIN_ID_NAME ),
+      generate_chain_id( ZATTERA_CHAIN_ID_NAME ),
       ZATTERA_CHAIN_ID_NAME,
       ZATTERA_ADDRESS_PREFIX
    };
