@@ -71,6 +71,7 @@ int main( int argc, char** argv )
       boost::program_options::options_description opts;
          opts.add_options()
          ("help,h", "Print this help message and exit.")
+         ("chain-id", bpo::value< std::string >()->implicit_value( ZATTERA_CHAIN_ID_NAME ), "Chain ID to connect to")
          ("server-rpc-endpoint,s", bpo::value<string>()->implicit_value("ws://127.0.0.1:8090"), "Server websocket RPC endpoint")
          ("cert-authority,a", bpo::value<string>()->default_value("_default"), "Trusted CA bundle file for connecting to wss:// TLS server")
          ("rpc-endpoint,r", bpo::value<string>()->implicit_value("127.0.0.1:8091"), "Endpoint for wallet websocket RPC to listen on")
@@ -80,9 +81,6 @@ int main( int argc, char** argv )
          ("daemon,d", "Run the wallet in daemon mode" )
          ("rpc-http-allowip", bpo::value<vector<string>>()->multitoken(), "Allows only specified IPs to connect to the HTTP endpoint" )
          ("wallet-file,w", bpo::value<string>()->implicit_value("wallet.json"), "wallet to load")
-#ifdef IS_TEST_MODE
-         ("chain-id", bpo::value< std::string >()->implicit_value( ZATTERA_CHAIN_ID_NAME ), "chain ID to connect to")
-#endif
          ;
       vector<string> allowed_ips;
 
@@ -100,12 +98,9 @@ int main( int argc, char** argv )
          wdump((allowed_ips));
       }
 
-      zattera::protocol::chain_id_type _zattera_chain_id = ZATTERA_CHAIN_ID;  // Initialize with default
-
-#ifdef IS_TEST_MODE
+      zattera::protocol::chain_id_type chain_id = ZATTERA_CHAIN_ID;  // Initialize with default
       if( options.count("chain-id") )
-            _zattera_chain_id = generate_chain_id( options["chain-id"].as< std::string >() );
-#endif
+            chain_id = generate_chain_id( options["chain-id"].as< std::string >() );
 
       fc::path data_dir;
       fc::logging_config cfg;
@@ -157,7 +152,7 @@ int main( int argc, char** argv )
       auto con  = client.connect( wdata.ws_server );
       auto apic = std::make_shared<fc::rpc::websocket_api_connection>(*con);
 
-      auto wapiptr = std::make_shared<wallet_api>( wdata, _zattera_chain_id, *apic );
+      auto wapiptr = std::make_shared<wallet_api>( wdata, chain_id, *apic );
       wapiptr->set_wallet_filename( wallet_file.generic_string() );
       wapiptr->load_wallet_file();
 

@@ -81,7 +81,7 @@ class wallet_api_impl;
 class wallet_api
 {
    public:
-      wallet_api( const wallet_data& initial_data, const zattera::protocol::chain_id_type& _zattera_chain_id, fc::api_connection& conn );
+      wallet_api( const wallet_data& initial_data, const zattera::protocol::chain_id_type& chain_id, fc::api_connection& conn );
       virtual ~wallet_api();
 
       bool copy_wallet_file( string destination_filename );

@@ -216,14 +216,14 @@ class wallet_api_impl
 
 public:
    wallet_api& self;
-   wallet_api_impl( wallet_api& s, const wallet_data& initial_data, const zattera::protocol::chain_id_type& _zattera_chain_id, fc::api_connection& conn )
+   wallet_api_impl( wallet_api& s, const wallet_data& initial_data, const zattera::protocol::chain_id_type& chain_id, fc::api_connection& conn )
       : self( s ),
+        _chain_id( chain_id ),
         _remote_api( conn )
    {
       init_prototype_ops();
 
       _wallet.ws_server = initial_data.ws_server;
-      zattera_chain_id = _zattera_chain_id;
    }
    virtual ~wallet_api_impl()
    {}
@@ -659,7 +659,7 @@ public:
       }
 
       auto minimal_signing_keys = tx.minimize_required_signatures(
-         zattera_chain_id,
+         _chain_id,
          available_keys,
          [&]( const string& account_name ) -> const authority&
          { return (get_account_from_lut( account_name ).active); },
@@ -675,7 +675,7 @@ public:
       {
          auto it = available_private_keys.find(k);
          FC_ASSERT( it != available_private_keys.end() );
-         tx.sign( it->second, zattera_chain_id );
+         tx.sign( it->second, _chain_id );
       }
 
       if( broadcast )
@@ -865,7 +865,7 @@ public:
 
    string                                  _wallet_filename;
    wallet_data                             _wallet;
-   zattera::protocol::chain_id_type          zattera_chain_id;
+   zattera::protocol::chain_id_type        _chain_id;
 
    map<public_key_type,string>             _keys;
    fc::sha512                              _checksum;
@@ -886,8 +886,8 @@ public:
 
 namespace zattera { namespace wallet {
 
-wallet_api::wallet_api(const wallet_data& initial_data, const zattera::protocol::chain_id_type& _zattera_chain_id, fc::api_connection& conn)
-   : my(new detail::wallet_api_impl(*this, initial_data, _zattera_chain_id, conn))
+wallet_api::wallet_api(const wallet_data& initial_data, const zattera::protocol::chain_id_type& chain_id, fc::api_connection& conn)
+   : my(new detail::wallet_api_impl(*this, initial_data, chain_id, conn))
 {}
 
 wallet_api::~wallet_api(){}

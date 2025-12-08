@@ -31,6 +31,7 @@ add_library( zattera_protocol
              asset.cpp
              version.cpp
              get_config.cpp
+             runtime_config.cpp
 
              ${HEADERS}
              ${hardfork_hpp_file}

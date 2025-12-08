@@ -294,6 +294,10 @@ bfs::path chain_plugin::state_storage_dir() const
 void chain_plugin::set_program_options(options_description& cli, options_description& cfg)
 {
    cfg.add_options()
+         ("chain-id", bpo::value<string>(),
+          "Chain ID to use for this network")
+         ("address-prefix", bpo::value<string>(),
+          "Address prefix to use for this network")
          ("shared-file-dir", bpo::value<bfs::path>()->default_value("blockchain"),
             "the location of the chain shared memory files (absolute path or relative to application data dir)")
          ("shared-file-size", bpo::value<string>()->default_value("24G"), "Size of the shared memory file. Default: 24G. If running a full node, increase this value to 200G.")
@@ -314,9 +318,6 @@ void chain_plugin::set_program_options(options_description& cli, options_descrip
          ("dump-memory-details", bpo::bool_switch()->default_value(false), "Dump database objects memory usage info. Use set-benchmark-interval to set dump interval.")
          ("check-locks", bpo::bool_switch()->default_value(false), "Check correctness of chainbase locking" )
          ("validate-database-invariants", bpo::bool_switch()->default_value(false), "Validate all supply invariants check out" )
-#ifdef IS_TEST_MODE
-         ("chain-id", bpo::value< std::string >()->default_value( ZATTERA_CHAIN_ID_NAME ), "chain ID to connect to")
-#endif
          ;
 }
 
@@ -372,10 +373,33 @@ void chain_plugin::plugin_initialize(const variables_map& options) {
       my->statsd_on_replay = options.at( "statsd-record-on-replay" ).as< bool >();
    }
 
-#ifdef IS_TEST_MODE
-   if( options.count( "chain-id" ) )
-      my->db.set_chain_id( options.at("chain-id").as< std::string >() );
-#endif
+   // Determine runtime chain ID (CLI/config → compile-time default)
+   std::string chain_id_name = ZATTERA_CHAIN_ID_NAME;
+
+   if( options.count("chain-id") )
+   {
+      auto name = options["chain-id"].as<string>();
+      if( !name.empty() )
+         chain_id_name = name;
+   }
+
+   // Determine address prefix (CLI/config → compile-time default)
+   std::string address_prefix = ZATTERA_ADDRESS_PREFIX;
+
+   if( options.count("address-prefix") )
+   {
+      auto prefix = options["address-prefix"].as<string>();
+      if( !prefix.empty() )
+         address_prefix = prefix;
+   }
+
+   // Set chain ID and address prefix in database
+   chain_id_type chain_id = fc::sha256::hash( chain_id_name );
+   my->db.set_chain_id( chain_id, chain_id_name );
+   ilog( "Chain ID: '${name}'", ("name", chain_id_name) );
+
+   my->db.set_address_prefix( address_prefix );
+   ilog( "Address prefix: '${prefix}'", ("prefix", address_prefix) );
 }
 
 #define BENCHMARK_FILE_NAME "replay_benchmark.json"

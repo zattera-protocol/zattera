@@ -4,6 +4,7 @@
 #pragma once
 #include <zattera/chain/block_log.hpp>
 #include <zattera/chain/block_notification.hpp>
+#include <zattera/chain/chain_property_object.hpp>
 #include <zattera/chain/fork_database.hpp>
 #include <zattera/chain/global_property_object.hpp>
 #include <zattera/chain/hardfork_property_object.hpp>
@@ -154,9 +155,12 @@ namespace zattera { namespace chain {
          const signed_transaction   get_recent_transaction( const transaction_id_type& trx_id )const;
          std::vector<block_id_type> get_block_ids_on_fork(block_id_type head_of_fork) const;
 
-         chain_id_type zattera_chain_id;
+         void set_chain_id( const chain_id_type& id, const std::string& name );
          chain_id_type get_chain_id() const;
-         void set_chain_id( const std::string& _chain_id_name );
+         std::string get_chain_id_name() const;
+
+         void set_address_prefix( const std::string& prefix );
+         std::string get_address_prefix() const;
 
          /** Allows to visit all stored blocks until processor returns true. Caller is responsible for block disasembling
           * const signed_block_header& - header of previous block
@@ -498,6 +502,10 @@ namespace zattera { namespace chain {
          template< typename MultiIndexType >
          friend void add_plugin_index( database& db );
 
+         chain_id_type                 _chain_id;
+         std::string                   _chain_id_name;
+         std::string                   _address_prefix;
+
          transaction_id_type           _current_trx_id;
          uint32_t                      _current_block_num    = 0;
          int32_t                       _current_trx_in_block = 0;
@@ -508,7 +516,7 @@ namespace zattera { namespace chain {
 
          flat_map<uint32_t,block_id_type>  _checkpoints;
 
-         node_property_object              _node_property_object;
+         node_property_object          _node_property_object;
 
          uint32_t                      _flush_blocks = 0;
          uint32_t                      _next_flush_block = 0;

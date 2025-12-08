@@ -1,4 +1,5 @@
 #include <zattera/protocol/zattera_operations.hpp>
+#include <zattera/protocol/runtime_config.hpp>
 
 #include <zattera/chain/block_summary_object.hpp>
 #include <zattera/chain/custom_operation_interpreter.hpp>
@@ -89,7 +90,6 @@ database_impl::database_impl( database& self )
 database::database()
    : _my( new database_impl(*this) )
 {
-   set_chain_id( ZATTERA_CHAIN_ID_NAME );
 }
 
 database::~database()
@@ -136,6 +136,22 @@ void database::open( const open_args& args )
          FC_ASSERT( head_block.valid() && head_block->id() == head_block_id(), "Chain state does not match block log. Please reindex blockchain." );
 
          _fork_db.start_block( *head_block );
+
+         // Existing chain: verify stored chain ID and address prefix
+         const auto& cpo = get<chain_property_object>();
+
+         FC_ASSERT( cpo.chain_id == _chain_id,
+                    "Chain ID mismatch: Database has '${stored}', but current config is '${config}'",
+                    ("stored", to_string( cpo.chain_id_name ))
+                    ("config", _chain_id_name) );
+
+         FC_ASSERT( to_string( cpo.address_prefix ) == _address_prefix,
+                    "Address prefix mismatch: Database has '${stored}', but current config is '${config}'",
+                    ("stored", to_string( cpo.address_prefix ))
+                    ("config", _address_prefix) );
+
+         ilog( "Chain ID verified: '${name}'", ("name", _chain_id_name) );
+         ilog( "Address prefix verified: ${prefix}", ("prefix", _address_prefix) );
       }
 
       with_read_lock( [&]()
@@ -382,14 +398,49 @@ std::vector< block_id_type > database::get_block_ids_on_fork( block_id_type head
    return result;
 } FC_CAPTURE_AND_RETHROW() }
 
-chain_id_type database::get_chain_id() const
+void database::set_chain_id( const chain_id_type& id, const std::string& name )
 {
-   return zattera_chain_id;
+   FC_ASSERT( !name.empty(), "Chain ID name cannot be empty." );
+
+   // If already set to the same value, just return
+   if( _chain_id == id && _chain_id_name == name )
+      return;
+
+   FC_ASSERT( _chain_id == chain_id_type(),
+              "Chain ID already set. Cannot change after initialization." );
+
+   _chain_id = id;
+   _chain_id_name = name;
+
+   // Update global runtime config in protocol layer
+   zattera::protocol::set_chain_id( id, name );
 }
 
-void database::set_chain_id( const std::string& _chain_id_name )
+chain_id_type database::get_chain_id() const
 {
-   zattera_chain_id = generate_chain_id( _chain_id_name );
+   return _chain_id;
+}
+
+std::string database::get_chain_id_name() const
+{
+   return _chain_id_name;
+}
+
+void database::set_address_prefix( const std::string& prefix )
+{
+   FC_ASSERT( _address_prefix.empty(),
+              "Address prefix already set. Cannot change after initialization." );
+   FC_ASSERT( !prefix.empty(),
+              "Address prefix cannot be empty." );
+   _address_prefix = prefix;
+
+   // Update global runtime config in protocol layer
+   zattera::protocol::set_address_prefix( prefix );
+}
+
+std::string database::get_address_prefix() const
+{
+   return _address_prefix;
 }
 
 void database::foreach_block(std::function<bool(const signed_block_header&, const signed_block&)> processor) const
@@ -2167,6 +2218,7 @@ std::shared_ptr< custom_operation_interpreter > database::get_custom_json_evalua
 
 void database::initialize_indexes()
 {
+   add_core_index< chain_property_index                    >(*this);
    add_core_index< dynamic_global_property_index           >(*this);
    add_core_index< account_index                           >(*this);
    add_core_index< account_authority_index                 >(*this);
@@ -2334,6 +2386,14 @@ void database::init_genesis( uint64_t initial_supply, uint64_t zbd_initial_suppl
             w.schedule    = witness_object::timeshare;
          } );
       }
+
+      // Record chain ID and address prefix in genesis block
+      create< chain_property_object >( [&]( chain_property_object& c )
+      {
+         c.chain_id = _chain_id;
+         from_string( c.chain_id_name, _chain_id_name );
+         from_string( c.address_prefix, _address_prefix );
+      });
 
       create< dynamic_global_property_object >( [&]( dynamic_global_property_object& p )
       {
