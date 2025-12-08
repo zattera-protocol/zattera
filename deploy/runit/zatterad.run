@@ -2,7 +2,7 @@
 
 VERSION=`cat /etc/zatterad-version`
 
-if [[ "$ZATTERAD_NODE_MODE" != "testnet" ]]; then
+if [[ ! "$IS_TEST_MODE" ]]; then
   if [[ "$USE_HIGH_MEMORY" ]]; then
     ZATTERAD="/usr/local/zatterad-high/bin/zatterad"
   else

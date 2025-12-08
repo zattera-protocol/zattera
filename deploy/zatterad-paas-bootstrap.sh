@@ -2,14 +2,10 @@
 
 VERSION=`cat /etc/zatterad-version`
 
-if [[ "$ZATTERAD_NODE_MODE" != "testnet" ]]; then
-  if [[ "$USE_HIGH_MEMORY" ]]; then
-    ZATTERAD="/usr/local/zatterad-high/bin/zatterad"
-  else
-    ZATTERAD="/usr/local/zatterad-low/bin/zatterad"
-  fi
+if [[ "$USE_HIGH_MEMORY" ]]; then
+  ZATTERAD="/usr/local/zatterad-high/bin/zatterad"
 else
-  ZATTERAD="/usr/local/zatterad-test/bin/zatterad"
+  ZATTERAD="/usr/local/zatterad-low/bin/zatterad"
 fi
 
 # copy config from image (data dir is cleaned on every PaaS restart)

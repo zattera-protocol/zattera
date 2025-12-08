@@ -24,6 +24,7 @@ Docker container entrypoint script that configures and starts zatterad based on 
 
 **Environment Variables:**
 - `ZATTERAD_NODE_MODE=<mode>` - Node mode: `fullnode`, `broadcast`, `ahnode`, `witness`, or `testnet` (sets config file)
+- `IS_TEST_MODE=1` - Enable test mode (uses zatterad-test binary built with BUILD_ZATTERA_TEST_MODE=ON)
 - `USE_HIGH_MEMORY=1` - Enable high-memory mode with in-memory account history (uses zatterad-high binary)
 - `USE_NGINX_PROXY=1` - Enable NGINX reverse proxy with `/health` endpoint
 - `USE_PUBLIC_SHARED_MEMORY=1` - Download public shared memory snapshot on startup
@@ -48,6 +49,9 @@ docker run -e USE_HIGH_MEMORY=1 -e ZATTERAD_NODE_MODE=fullnode zatterahub/zatter
 
 # Run testnet node
 docker run -e ZATTERAD_NODE_MODE=testnet zatterahub/zattera:latest
+
+# Run with test mode binary (for testing/development)
+docker run -e IS_TEST_MODE=1 zatterahub/zattera:latest
 
 # Run test node (private testnet)
 docker run -e IS_TEST_NODE=1 zatterahub/zattera:latest
