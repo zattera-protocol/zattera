@@ -13,7 +13,7 @@
 
 #define ZATTERA_GENESIS_PRIVATE_KEY             (fc::ecc::private_key::regenerate(fc::sha256::hash(std::string("init_key"))))
 #define ZATTERA_GENESIS_PUBLIC_KEY_STR          (std::string( zattera::protocol::public_key_type(ZATTERA_GENESIS_PRIVATE_KEY.get_public_key()) ))
-#define ZATTERA_CHAIN_ID_NAME                   "testnet"
+#define ZATTERA_CHAIN_ID_NAME                   "test"
 #define ZATTERA_CHAIN_ID                        (fc::sha256::hash(ZATTERA_CHAIN_ID_NAME))
 #define ZATTERA_ADDRESS_PREFIX                  "TST"
 
@@ -73,10 +73,7 @@
 
 #define ZATTERA_GENESIS_WITNESS_NAME            "genesis"
 #define ZATTERA_NUM_GENESIS_WITNESSES           1
-#define ZATTERA_INIT_TIME                       (fc::time_point_sec());
-
 #define ZATTERA_MAX_WITNESSES                   21
-
 #define ZATTERA_MAX_VOTED_WITNESSES             20
 #define ZATTERA_MAX_RUNNER_WITNESSES            1
 

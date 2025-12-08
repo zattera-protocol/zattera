@@ -18,10 +18,10 @@
 #include <array>
 #include <iostream>
 
-#define INITIAL_TEST_SUPPLY (10000000000ll)
-#define ZBD_INITIAL_TEST_SUPPLY (20000000ll)
+#define TEST_INITIAL_SUPPLY (10000000000ll)
+#define TEST_ZBD_INITIAL_SUPPLY (20000000ll)
 
-extern uint32_t ZATTERA_TESTING_GENESIS_TIMESTAMP;
+extern uint32_t test_genesis_timestamp;
 
 #define PUSH_TX \
    zattera::chain::test::_push_transaction

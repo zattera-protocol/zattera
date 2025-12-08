@@ -21,7 +21,7 @@
 
 //using namespace zattera::chain::test;
 
-uint32_t ZATTERA_TESTING_GENESIS_TIMESTAMP = 1431700000;
+uint32_t test_genesis_timestamp = 1431700000;
 
 using namespace zattera::plugins::webserver;
 using namespace zattera::plugins::database_api;
@@ -123,8 +123,8 @@ void clean_database_fixture::resize_shared_mem( uint64_t size )
       database::open_args args;
       args.data_dir = data_dir->path();
       args.shared_mem_dir = args.data_dir;
-      args.initial_supply = INITIAL_TEST_SUPPLY;
-      args.zbd_initial_supply = ZBD_INITIAL_TEST_SUPPLY;
+      args.initial_supply = TEST_INITIAL_SUPPLY;
+      args.zbd_initial_supply = TEST_ZBD_INITIAL_SUPPLY;
       args.shared_file_size = size;
       db->open( args );
    }
@@ -227,8 +227,8 @@ void database_fixture::open_database()
       database::open_args args;
       args.data_dir = data_dir->path();
       args.shared_mem_dir = args.data_dir;
-      args.initial_supply = INITIAL_TEST_SUPPLY;
-      args.zbd_initial_supply = ZBD_INITIAL_TEST_SUPPLY;
+      args.initial_supply = TEST_INITIAL_SUPPLY;
+      args.zbd_initial_supply = TEST_ZBD_INITIAL_SUPPLY;
       args.shared_file_size = 1024 * 1024 * 1024;   // 512MB file for testing (avoid OOM on long test runs)
       db->open(args);
    }

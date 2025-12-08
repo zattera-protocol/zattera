@@ -51,8 +51,8 @@ void open_test_database( database& db, const fc::path& dir )
    database::open_args args;
    args.data_dir = dir;
    args.shared_mem_dir = dir;
-   args.initial_supply = INITIAL_TEST_SUPPLY;
-   args.zbd_initial_supply = ZBD_INITIAL_TEST_SUPPLY;
+   args.initial_supply = TEST_INITIAL_SUPPLY;
+   args.zbd_initial_supply = TEST_ZBD_INITIAL_SUPPLY;
    args.shared_file_size = TEST_SHARED_MEM_SIZE;
    db.open( args );
 }
@@ -60,7 +60,7 @@ void open_test_database( database& db, const fc::path& dir )
 BOOST_AUTO_TEST_CASE( generate_empty_blocks )
 {
    try {
-      fc::time_point_sec now( ZATTERA_TESTING_GENESIS_TIMESTAMP );
+      fc::time_point_sec now( test_genesis_timestamp );
       fc::temp_directory data_dir( zattera::utilities::temp_directory_path() );
       signed_block b;
 
@@ -135,7 +135,7 @@ BOOST_AUTO_TEST_CASE( undo_block )
          database db;
          db._log_hardforks = false;
          open_test_database( db, data_dir.path() );
-         fc::time_point_sec now( ZATTERA_TESTING_GENESIS_TIMESTAMP );
+         fc::time_point_sec now( test_genesis_timestamp );
          std::vector< time_point_sec > time_stack;
 
          auto init_account_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("init_key")) );

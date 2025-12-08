@@ -25,19 +25,19 @@
 #include <iostream>
 #include <boost/test/included/unit_test.hpp>
 
-// extern uint32_t ZATTERA_TESTING_GENESIS_TIMESTAMP;
+extern uint32_t test_genesis_timestamp;
 
 boost::unit_test::test_suite* init_unit_test_suite(int argc, char* argv[])
 {
    std::srand(time(NULL));
    std::cout << "Random number generator seeded to " << time(NULL) << std::endl;
-/*
-   const char* genesis_timestamp_str = getenv("ZATTERA_TESTING_GENESIS_TIMESTAMP");
+
+   const char* genesis_timestamp_str = getenv("ZATTERA_TEST_GENESIS_TIMESTAMP");
    if( genesis_timestamp_str != nullptr )
    {
-      ZATTERA_TESTING_GENESIS_TIMESTAMP = std::stoul( genesis_timestamp_str );
+      test_genesis_timestamp = std::stoul( genesis_timestamp_str );
    }
-   std::cout << "ZATTERA_TESTING_GENESIS_TIMESTAMP is " << ZATTERA_TESTING_GENESIS_TIMESTAMP << std::endl;
-*/
+   std::cout << "Genesis timestamp: " << test_genesis_timestamp << std::endl;
+
    return nullptr;
 }
