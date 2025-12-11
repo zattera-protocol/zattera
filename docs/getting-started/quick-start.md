@@ -30,7 +30,13 @@ Download and install [Docker Desktop](https://www.docker.com/products/docker-des
 
 ## Running Zattera with Docker
 
-The easiest way to get started with Zattera is using Docker:
+The easiest way to get started with Zattera is using Docker.
+
+First, pull the latest stable image:
+
+```bash
+docker pull zatterahub/zattera:stable
+```
 
 ### Low Memory Node
 
