@@ -1333,7 +1333,7 @@ void database::clear_null_account_balance()
    if( null_account.savings_liquid_balance.amount > 0 )
    {
       total_liquid += null_account.savings_liquid_balance;
-      adjust_savings_balance( null_account, -null_account.savings_liquid_balance );
+      adjust_savings_liquid_balance( null_account, -null_account.savings_liquid_balance );
    }
 
    if( null_account.dollar_balance.amount > 0 )
@@ -1345,7 +1345,7 @@ void database::clear_null_account_balance()
    if( null_account.savings_dollar_balance.amount > 0 )
    {
       total_dollars += null_account.savings_dollar_balance;
-      adjust_savings_balance( null_account, -null_account.savings_dollar_balance );
+      adjust_savings_liquid_balance( null_account, -null_account.savings_dollar_balance );
    }
 
    if( null_account.vesting_shares.amount > 0 )
@@ -3606,7 +3606,7 @@ void database::adjust_balance( const account_name_type& name, const asset& delta
    modify_balance( a, delta, true );
 }
 
-void database::adjust_savings_balance( const account_object& a, const asset& delta )
+void database::adjust_savings_liquid_balance( const account_object& a, const asset& delta )
 {
    modify( a, [&]( account_object& acnt )
    {
@@ -3713,7 +3713,7 @@ asset database::get_balance( const account_object& a, asset_symbol_type symbol )
    }
 }
 
-asset database::get_savings_balance( const account_object& a, asset_symbol_type symbol )const
+asset database::get_savings_liquid_balance( const account_object& a, asset_symbol_type symbol )const
 {
    switch( symbol.asset_num )
    {

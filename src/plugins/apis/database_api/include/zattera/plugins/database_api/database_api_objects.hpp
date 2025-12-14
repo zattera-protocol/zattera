@@ -176,8 +176,8 @@ struct api_account_object
       can_vote( a.can_vote ),
       voting_power( a.voting_power ),
       last_vote_time( a.last_vote_time ),
-      balance( a.liquid_balance ),
-      savings_balance( a.savings_liquid_balance ),
+      liquid_balance( a.liquid_balance ),
+      savings_liquid_balance( a.savings_liquid_balance ),
       dollar_balance( a.dollar_balance ),
       dollar_seconds( a.dollar_seconds ),
       dollar_seconds_last_update( a.dollar_seconds_last_update ),
@@ -246,8 +246,8 @@ struct api_account_object
    uint16_t          voting_power = 0;
    time_point_sec    last_vote_time;
 
-   asset             balance;
-   asset             savings_balance;
+   asset             liquid_balance;
+   asset             savings_liquid_balance;
 
    asset             dollar_balance;
    uint128_t         dollar_seconds;
@@ -538,8 +538,8 @@ FC_REFLECT( zattera::plugins::database_api::api_account_object,
              (created)(mined)
              (recovery_account)(last_account_recovery)(reset_account)
              (comment_count)(lifetime_vote_count)(post_count)(can_vote)(voting_power)(last_vote_time)
-             (balance)
-             (savings_balance)
+             (liquid_balance)
+             (savings_liquid_balance)
              (dollar_balance)(dollar_seconds)(dollar_seconds_last_update)(dollar_last_interest_payment)
              (savings_dollar_balance)(savings_dollar_seconds)(savings_dollar_seconds_last_update)(savings_dollar_last_interest_payment)(savings_withdraw_requests)
              (reward_dollar_balance)(reward_liquid_balance)(reward_vesting_balance)(reward_vesting_liquid)

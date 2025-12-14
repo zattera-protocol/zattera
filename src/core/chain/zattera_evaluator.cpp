@@ -1730,7 +1730,7 @@ void transfer_to_savings_evaluator::do_apply( const transfer_to_savings_operatio
    FC_ASSERT( _db.get_balance( from, op.amount.symbol ) >= op.amount, "Account does not have sufficient funds to transfer to savings." );
 
    _db.adjust_balance( from, -op.amount );
-   _db.adjust_savings_balance( to, op.amount );
+   _db.adjust_savings_liquid_balance( to, op.amount );
 }
 
 void transfer_from_savings_evaluator::do_apply( const transfer_from_savings_operation& op )
@@ -1740,8 +1740,8 @@ void transfer_from_savings_evaluator::do_apply( const transfer_from_savings_oper
 
    FC_ASSERT( from.savings_withdraw_requests < ZATTERA_SAVINGS_WITHDRAW_REQUEST_LIMIT, "Account has reached limit for pending withdraw requests." );
 
-   FC_ASSERT( _db.get_savings_balance( from, op.amount.symbol ) >= op.amount );
-   _db.adjust_savings_balance( from, -op.amount );
+   FC_ASSERT( _db.get_savings_liquid_balance( from, op.amount.symbol ) >= op.amount );
+   _db.adjust_savings_liquid_balance( from, -op.amount );
    _db.create<savings_withdraw_object>( [&]( savings_withdraw_object& s ) {
       s.from   = op.from;
       s.to     = op.to;
@@ -1762,7 +1762,7 @@ void transfer_from_savings_evaluator::do_apply( const transfer_from_savings_oper
 void cancel_transfer_from_savings_evaluator::do_apply( const cancel_transfer_from_savings_operation& op )
 {
    const auto& swo = _db.get_savings_withdraw( op.from, op.request_id );
-   _db.adjust_savings_balance( _db.get_account( swo.from ), swo.amount );
+   _db.adjust_savings_liquid_balance( _db.get_account( swo.from ), swo.amount );
    _db.remove( swo );
 
    const auto& from = _db.get_account( op.from );
