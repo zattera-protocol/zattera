@@ -189,8 +189,8 @@ struct api_account_object
       savings_withdraw_requests( a.savings_withdraw_requests ),
       reward_dollar_balance( a.reward_dollar_balance ),
       reward_liquid_balance( a.reward_liquid_balance ),
-      reward_vesting_balance( a.reward_vesting_share_balance ),
-      reward_vesting_liquid( a.reward_vesting_liquid_balance ),
+      reward_vesting_share_balance( a.reward_vesting_share_balance ),
+      reward_vesting_liquid_balance( a.reward_vesting_liquid_balance ),
       curation_rewards( a.curation_rewards ),
       posting_rewards( a.posting_rewards ),
       vesting_shares( a.vesting_shares ),
@@ -263,8 +263,8 @@ struct api_account_object
 
    asset             reward_dollar_balance;
    asset             reward_liquid_balance;
-   asset             reward_vesting_balance;
-   asset             reward_vesting_liquid;
+   asset             reward_vesting_share_balance;
+   asset             reward_vesting_liquid_balance;
 
    share_type        curation_rewards;
    share_type        posting_rewards;
@@ -542,7 +542,7 @@ FC_REFLECT( zattera::plugins::database_api::api_account_object,
              (savings_liquid_balance)
              (dollar_balance)(dollar_seconds)(dollar_seconds_last_update)(dollar_last_interest_payment)
              (savings_dollar_balance)(savings_dollar_seconds)(savings_dollar_seconds_last_update)(savings_dollar_last_interest_payment)(savings_withdraw_requests)
-             (reward_dollar_balance)(reward_liquid_balance)(reward_vesting_balance)(reward_vesting_liquid)
+             (reward_dollar_balance)(reward_liquid_balance)(reward_vesting_share_balance)(reward_vesting_liquid_balance)
              (vesting_shares)(delegated_vesting_shares)(received_vesting_shares)(vesting_withdraw_rate)(next_vesting_withdrawal)(withdrawn)(to_withdraw)(withdraw_routes)
              (curation_rewards)
              (posting_rewards)
