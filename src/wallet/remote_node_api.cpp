@@ -450,9 +450,9 @@ vector<account_name_type> remote_node_api::get_active_witnesses() const
  */
 vector<database_api::api_convert_request_object> remote_node_api::get_conversion_requests( account_name_type account ) const
 {
-   database_api::find_zbd_conversion_requests_args args{ .account = account };
-   return send_call( "database_api", "find_zbd_conversion_requests", fc::variant(args) )
-      .as<database_api::find_zbd_conversion_requests_return>().requests;
+   database_api::find_dollar_conversion_requests_args args{ .account = account };
+   return send_call( "database_api", "find_dollar_conversion_requests", fc::variant(args) )
+      .as<database_api::find_dollar_conversion_requests_return>().requests;
 }
 
 /**

@@ -39,3 +39,5 @@ __pycache__/
 AGENTS.md
 CLAUDE.md
 .claude
+
+witness_node_data_dir

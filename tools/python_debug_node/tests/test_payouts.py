@@ -113,7 +113,7 @@ def run_zatterad_tests(debug_node):
       """
       print("Printing account reward dump:")
       sorted_rewards = sorted(account_rewards.items(), key=operator.itemgetter(1))
-      print("account, curation_ztr")
+      print("account, curation_liquid")
       for rew in sorted_rewards:
          print(rew[ 0 ] + ", " + str(rew[ 1 ]) + ", " + str(vote_count[ rew[ 0 ] ]))
 

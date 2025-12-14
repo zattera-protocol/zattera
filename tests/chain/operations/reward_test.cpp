@@ -37,8 +37,8 @@ BOOST_AUTO_TEST_CASE( validate_reward_balance_claim )
    {
       claim_reward_balance_operation op;
       op.account = "alice";
-      op.reward_ztr = ASSET( "0.000 TTR" );
-      op.reward_zbd = ASSET( "0.000 TBD" );
+      op.reward_liquids = ASSET( "0.000 TTR" );
+      op.reward_dollars = ASSET( "0.000 TBD" );
       op.reward_vests = ASSET( "0.000000 VESTS" );
 
 
@@ -47,14 +47,14 @@ BOOST_AUTO_TEST_CASE( validate_reward_balance_claim )
 
 
       BOOST_TEST_MESSAGE( "Testing single reward claims" );
-      op.reward_ztr.amount = 1000;
+      op.reward_liquids.amount = 1000;
       op.validate();
 
-      op.reward_ztr.amount = 0;
-      op.reward_zbd.amount = 1000;
+      op.reward_liquids.amount = 0;
+      op.reward_dollars.amount = 1000;
       op.validate();
 
-      op.reward_zbd.amount = 0;
+      op.reward_dollars.amount = 0;
       op.reward_vests.amount = 1000;
       op.validate();
 
@@ -62,25 +62,25 @@ BOOST_AUTO_TEST_CASE( validate_reward_balance_claim )
 
 
       BOOST_TEST_MESSAGE( "Testing wrong ZTR symbol" );
-      op.reward_ztr = ASSET( "1.000 TBD" );
+      op.reward_liquids = ASSET( "1.000 TBD" );
       ZATTERA_REQUIRE_THROW( op.validate(), fc::assert_exception );
 
 
       BOOST_TEST_MESSAGE( "Testing wrong ZBD symbol" );
-      op.reward_ztr = ASSET( "1.000 TTR" );
-      op.reward_zbd = ASSET( "1.000 TTR" );
+      op.reward_liquids = ASSET( "1.000 TTR" );
+      op.reward_dollars = ASSET( "1.000 TTR" );
       ZATTERA_REQUIRE_THROW( op.validate(), fc::assert_exception );
 
 
       BOOST_TEST_MESSAGE( "Testing wrong VESTS symbol" );
-      op.reward_zbd = ASSET( "1.000 TBD" );
+      op.reward_dollars = ASSET( "1.000 TBD" );
       op.reward_vests = ASSET( "1.000 TTR" );
       ZATTERA_REQUIRE_THROW( op.validate(), fc::assert_exception );
 
 
       BOOST_TEST_MESSAGE( "Testing a single negative amount" );
-      op.reward_ztr.amount = 1000;
-      op.reward_zbd.amount = -1000;
+      op.reward_liquids.amount = 1000;
+      op.reward_dollars.amount = -1000;
       ZATTERA_REQUIRE_THROW( op.validate(), fc::assert_exception );
    }
    FC_LOG_AND_RETHROW()
@@ -127,27 +127,27 @@ BOOST_AUTO_TEST_CASE( apply_reward_balance_claim )
       {
          db.modify( db.get_account( "alice" ), []( account_object& a )
          {
-            a.reward_ztr_balance = ASSET( "10.000 TTR" );
-            a.reward_zbd_balance = ASSET( "10.000 TBD" );
-            a.reward_vesting_balance = ASSET( "10.000000 VESTS" );
-            a.reward_vesting_ztr = ASSET( "10.000 TTR" );
+            a.reward_liquid_balance = ASSET( "10.000 TTR" );
+            a.reward_dollar_balance = ASSET( "10.000 TBD" );
+            a.reward_vesting_share_balance = ASSET( "10.000000 VESTS" );
+            a.reward_vesting_liquid_balance = ASSET( "10.000 TTR" );
          });
 
          db.modify( db.get_dynamic_global_properties(), []( dynamic_global_property_object& gpo )
          {
-            gpo.current_supply += ASSET( "20.000 TTR" );
-            gpo.current_zbd_supply += ASSET( "10.000 TBD" );
-            gpo.virtual_supply += ASSET( "20.000 TTR" );
+            gpo.current_liquid_supply += ASSET( "20.000 TTR" );
+            gpo.current_dollar_supply += ASSET( "10.000 TBD" );
+            gpo.virtual_liquid_supply += ASSET( "20.000 TTR" );
             gpo.pending_rewarded_vesting_shares += ASSET( "10.000000 VESTS" );
-            gpo.pending_rewarded_vesting_ztr += ASSET( "10.000 TTR" );
+            gpo.pending_rewarded_vesting_liquid += ASSET( "10.000 TTR" );
          });
       });
 
       generate_block();
       validate_database();
 
-      auto alice_ztr = db->get_account( "alice" ).balance;
-      auto alice_zbd = db->get_account( "alice" ).zbd_balance;
+      auto alice_liquid = db->get_account( "alice" ).liquid_balance;
+      auto alice_dollar = db->get_account( "alice" ).dollar_balance;
       auto alice_vests = db->get_account( "alice" ).vesting_shares;
 
 
@@ -157,8 +157,8 @@ BOOST_AUTO_TEST_CASE( apply_reward_balance_claim )
       signed_transaction tx;
 
       op.account = "alice";
-      op.reward_ztr = ASSET( "20.000 TTR" );
-      op.reward_zbd = ASSET( "0.000 TBD" );
+      op.reward_liquids = ASSET( "20.000 TTR" );
+      op.reward_dollars = ASSET( "0.000 TBD" );
       op.reward_vests = ASSET( "0.000000 VESTS" );
 
       tx.operations.push_back( op );
@@ -169,20 +169,20 @@ BOOST_AUTO_TEST_CASE( apply_reward_balance_claim )
 
       BOOST_TEST_MESSAGE( "--- Claiming a partial reward balance" );
 
-      op.reward_ztr = ASSET( "0.000 TTR" );
+      op.reward_liquids = ASSET( "0.000 TTR" );
       op.reward_vests = ASSET( "5.000000 VESTS" );
       tx.clear();
       tx.operations.push_back( op );
       tx.sign( alice_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_account( "alice" ).balance == alice_ztr + op.reward_ztr );
-      BOOST_REQUIRE( db->get_account( "alice" ).reward_ztr_balance == ASSET( "10.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( "alice" ).zbd_balance == alice_zbd + op.reward_zbd );
-      BOOST_REQUIRE( db->get_account( "alice" ).reward_zbd_balance == ASSET( "10.000 TBD" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == alice_liquid + op.reward_liquids );
+      BOOST_REQUIRE( db->get_account( "alice" ).reward_liquid_balance == ASSET( "10.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).dollar_balance == alice_dollar + op.reward_dollars );
+      BOOST_REQUIRE( db->get_account( "alice" ).reward_dollar_balance == ASSET( "10.000 TBD" ) );
       BOOST_REQUIRE( db->get_account( "alice" ).vesting_shares == alice_vests + op.reward_vests );
-      BOOST_REQUIRE( db->get_account( "alice" ).reward_vesting_balance == ASSET( "5.000000 VESTS" ) );
-      BOOST_REQUIRE( db->get_account( "alice" ).reward_vesting_ztr == ASSET( "5.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).reward_vesting_share_balance == ASSET( "5.000000 VESTS" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).reward_vesting_liquid_balance == ASSET( "5.000 TTR" ) );
       validate_database();
 
       alice_vests += op.reward_vests;
@@ -190,20 +190,20 @@ BOOST_AUTO_TEST_CASE( apply_reward_balance_claim )
 
       BOOST_TEST_MESSAGE( "--- Claiming the full reward balance" );
 
-      op.reward_ztr = ASSET( "10.000 TTR" );
-      op.reward_zbd = ASSET( "10.000 TBD" );
+      op.reward_liquids = ASSET( "10.000 TTR" );
+      op.reward_dollars = ASSET( "10.000 TBD" );
       tx.clear();
       tx.operations.push_back( op );
       tx.sign( alice_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_account( "alice" ).balance == alice_ztr + op.reward_ztr );
-      BOOST_REQUIRE( db->get_account( "alice" ).reward_ztr_balance == ASSET( "0.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( "alice" ).zbd_balance == alice_zbd + op.reward_zbd );
-      BOOST_REQUIRE( db->get_account( "alice" ).reward_zbd_balance == ASSET( "0.000 TBD" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == alice_liquid + op.reward_liquids );
+      BOOST_REQUIRE( db->get_account( "alice" ).reward_liquid_balance == ASSET( "0.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).dollar_balance == alice_dollar + op.reward_dollars );
+      BOOST_REQUIRE( db->get_account( "alice" ).reward_dollar_balance == ASSET( "0.000 TBD" ) );
       BOOST_REQUIRE( db->get_account( "alice" ).vesting_shares == alice_vests + op.reward_vests );
-      BOOST_REQUIRE( db->get_account( "alice" ).reward_vesting_balance == ASSET( "0.000000 VESTS" ) );
-      BOOST_REQUIRE( db->get_account( "alice" ).reward_vesting_ztr == ASSET( "0.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).reward_vesting_share_balance == ASSET( "0.000000 VESTS" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).reward_vesting_liquid_balance == ASSET( "0.000 TTR" ) );
             validate_database();
    }
    FC_LOG_AND_RETHROW()
@@ -261,8 +261,8 @@ BOOST_AUTO_TEST_CASE( distribute_reward_funds )
 
          BOOST_REQUIRE( post_rf.reward_balance.amount == 0 );
          BOOST_REQUIRE( comment_rf.reward_balance.amount > 0 );
-         BOOST_REQUIRE( db->get_account( "alice" ).reward_zbd_balance.amount > 0 );
-         BOOST_REQUIRE( db->get_account( "bob" ).reward_zbd_balance.amount == 0 );
+         BOOST_REQUIRE( db->get_account( "alice" ).reward_dollar_balance.amount > 0 );
+         BOOST_REQUIRE( db->get_account( "bob" ).reward_dollar_balance.amount == 0 );
          validate_database();
       }
 
@@ -274,8 +274,8 @@ BOOST_AUTO_TEST_CASE( distribute_reward_funds )
 
          BOOST_REQUIRE( post_rf.reward_balance.amount > 0 );
          BOOST_REQUIRE( comment_rf.reward_balance.amount == 0 );
-         BOOST_REQUIRE( db->get_account( "alice" ).reward_zbd_balance.amount > 0 );
-         BOOST_REQUIRE( db->get_account( "bob" ).reward_zbd_balance.amount > 0 );
+         BOOST_REQUIRE( db->get_account( "alice" ).reward_dollar_balance.amount > 0 );
+         BOOST_REQUIRE( db->get_account( "bob" ).reward_dollar_balance.amount > 0 );
          validate_database();
       }
    }

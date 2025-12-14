@@ -98,7 +98,7 @@ namespace zattera { namespace chain {
             fc::path data_dir;
             fc::path shared_mem_dir;
             uint64_t initial_supply = ZATTERA_INITIAL_SUPPLY;
-            uint64_t zbd_initial_supply = ZATTERA_ZBD_INITIAL_SUPPLY;
+            uint64_t dollar_initial_supply = ZATTERA_ZBD_INITIAL_SUPPLY;
             uint64_t shared_file_size = 0;
             uint16_t shared_file_full_threshold = 0;
             uint16_t shared_file_scale_rate = 0;
@@ -325,10 +325,10 @@ namespace zattera { namespace chain {
           */
          uint32_t get_slot_at_time(fc::time_point_sec when)const;
 
-         /** @return the zbd created and deposited to_account, may return ZTR if there is no median feed */
-         std::pair< asset, asset > create_zbd( const account_object& to_account, asset ztr, bool to_reward_balance=false );
-         asset create_vesting( const account_object& to_account, asset ztr, bool to_reward_balance=false );
-         void adjust_total_payout( const comment_object& a, const asset& zbd, const asset& curator_zbd_value, const asset& beneficiary_value );
+         /** @return the dollars created and deposited to_account, may return ZTR if there is no median feed */
+         std::pair< asset, asset > create_dollar( const account_object& to_account, asset liquid, bool to_reward_balance=false );
+         asset create_vesting( const account_object& to_account, asset liquid, bool to_reward_balance=false );
+         void adjust_total_payout( const comment_object& a, const asset& dollars, const asset& curator_dollar_value, const asset& beneficiary_value );
 
          void        adjust_balance( const account_object& a, const asset& delta );
          void        adjust_balance( const account_name_type& name, const asset& delta );
@@ -384,8 +384,8 @@ namespace zattera { namespace chain {
           * Helper method to return the current zbd value of a given amount of ZTR.
           * Return 0 ZBD if there isn't a current_median_history
           */
-         asset to_zbd( const asset& ztr )const;
-         asset to_ztr( const asset& zbd )const;
+         asset to_dollar( const asset& liquid )const;
+         asset to_liquid( const asset& dollar )const;
 
          time_point_sec   head_block_time()const;
          uint32_t         head_block_num()const;
@@ -403,7 +403,7 @@ namespace zattera { namespace chain {
          /// Reset the object graph in-memory
          void initialize_indexes();
          void init_schema();
-         void init_genesis(uint64_t initial_supply = ZATTERA_INITIAL_SUPPLY, uint64_t zbd_initial_supply = ZATTERA_ZBD_INITIAL_SUPPLY );
+         void init_genesis(uint64_t initial_supply = ZATTERA_INITIAL_SUPPLY, uint64_t dollar_initial_supply = ZATTERA_ZBD_INITIAL_SUPPLY );
 
          /**
           *  This method validates transactions without adding it to the pending state.

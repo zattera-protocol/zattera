@@ -50,41 +50,41 @@ namespace zattera { namespace chain {
          uint16_t          voting_power = ZATTERA_100_PERCENT;   ///< current voting power of this account, it falls after every vote
          time_point_sec    last_vote_time; ///< used to increase the voting power of this account the longer it goes without voting.
 
-         asset             balance = asset( 0, ZTR_SYMBOL );  ///< total liquid shares held by this account
-         asset             savings_balance = asset( 0, ZTR_SYMBOL );  ///< total liquid shares held by this account
+         asset             liquid_balance = asset( 0, ZTR_SYMBOL );  ///< total liquid shares held by this account
+         asset             savings_liquid_balance = asset( 0, ZTR_SYMBOL );  ///< total liquid shares held by this account
 
          /**
-          *  ZBD Deposits pay interest based upon the interest rate set by witnesses. The purpose of these
-          *  fields is to track the total (time * zbd_balance) that it is held. Then at the appointed time
+          *  Dollar Deposits pay interest based upon the interest rate set by witnesses. The purpose of these
+          *  fields is to track the total (time * dollar_balance) that it is held. Then at the appointed time
           *  interest can be paid using the following equation:
           *
-          *  interest = interest_rate * zbd_seconds / seconds_per_year
+          *  interest = interest_rate * dollar_seconds / seconds_per_year
           *
-          *  Every time the zbd_balance is updated the zbd_seconds is also updated. If at least
-          *  ZATTERA_MIN_COMPOUNDING_INTERVAL_SECONDS has past since zbd_last_interest_payment then
-          *  interest is added to zbd_balance.
+          *  Every time the dollar_balance is updated the dollar_seconds is also updated. If at least
+          *  ZATTERA_MIN_COMPOUNDING_INTERVAL_SECONDS has past since dollar_last_interest_payment then
+          *  interest is added to dollar_balance.
           *
-          *  @defgroup zbd_data zbd Balance Data
+          *  @defgroup dollar_data Dollar Balance Data
           */
          ///@{
-         asset             zbd_balance = asset( 0, ZBD_SYMBOL ); /// total zbd balance
-         uint128_t         zbd_seconds; ///< total zbd * how long it has been hel
-         time_point_sec    zbd_seconds_last_update; ///< the last time the zbd_seconds was updated
-         time_point_sec    zbd_last_interest_payment; ///< used to pay interest at most once per month
+         asset             dollar_balance = asset( 0, ZBD_SYMBOL ); /// total dollars balance
+         uint128_t         dollar_seconds; ///< total dollars * how long it has been hel
+         time_point_sec    dollar_seconds_last_update; ///< the last time the dollar_seconds was updated
+         time_point_sec    dollar_last_interest_payment; ///< used to pay interest at most once per month
 
 
-         asset             savings_zbd_balance = asset( 0, ZBD_SYMBOL ); /// total zbd balance
-         uint128_t         savings_zbd_seconds; ///< total zbd * how long it has been hel
-         time_point_sec    savings_zbd_seconds_last_update; ///< the last time the zbd_seconds was updated
-         time_point_sec    savings_zbd_last_interest_payment; ///< used to pay interest at most once per month
+         asset             savings_dollar_balance = asset( 0, ZBD_SYMBOL ); /// total dollars balance
+         uint128_t         savings_dollar_seconds; ///< total dollars * how long it has been hel
+         time_point_sec    savings_dollar_seconds_last_update; ///< the last time the dollar_seconds was updated
+         time_point_sec    savings_dollar_last_interest_payment; ///< used to pay interest at most once per month
 
          uint8_t           savings_withdraw_requests = 0;
          ///@}
 
-         asset             reward_zbd_balance = asset( 0, ZBD_SYMBOL );
-         asset             reward_ztr_balance = asset( 0, ZTR_SYMBOL );
-         asset             reward_vesting_balance = asset( 0, VESTS_SYMBOL );
-         asset             reward_vesting_ztr = asset( 0, ZTR_SYMBOL );
+         asset             reward_dollar_balance = asset( 0, ZBD_SYMBOL );
+         asset             reward_liquid_balance = asset( 0, ZTR_SYMBOL );
+         asset             reward_vesting_share_balance = asset( 0, VESTS_SYMBOL );
+         asset             reward_vesting_liquid_balance = asset( 0, ZTR_SYMBOL );
 
          share_type        curation_rewards = 0;
          share_type        posting_rewards = 0;
@@ -406,11 +406,11 @@ FC_REFLECT( zattera::chain::account_object,
              (created)(mined)
              (recovery_account)(last_account_recovery)(reset_account)
              (comment_count)(lifetime_vote_count)(post_count)(can_vote)(voting_power)(last_vote_time)
-             (balance)
-             (savings_balance)
-             (zbd_balance)(zbd_seconds)(zbd_seconds_last_update)(zbd_last_interest_payment)
-             (savings_zbd_balance)(savings_zbd_seconds)(savings_zbd_seconds_last_update)(savings_zbd_last_interest_payment)(savings_withdraw_requests)
-             (reward_ztr_balance)(reward_zbd_balance)(reward_vesting_balance)(reward_vesting_ztr)
+             (liquid_balance)
+             (savings_liquid_balance)
+             (dollar_balance)(dollar_seconds)(dollar_seconds_last_update)(dollar_last_interest_payment)
+             (savings_dollar_balance)(savings_dollar_seconds)(savings_dollar_seconds_last_update)(savings_dollar_last_interest_payment)(savings_withdraw_requests)
+             (reward_liquid_balance)(reward_dollar_balance)(reward_vesting_share_balance)(reward_vesting_liquid_balance)
              (vesting_shares)(delegated_vesting_shares)(received_vesting_shares)
              (vesting_withdraw_rate)(next_vesting_withdrawal)(withdrawn)(to_withdraw)(withdraw_routes)
              (curation_rewards)

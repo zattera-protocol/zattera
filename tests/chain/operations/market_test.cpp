@@ -122,8 +122,8 @@ BOOST_AUTO_TEST_CASE( apply_convert )
       tx.sign( bob_private_key, db->get_chain_id() );
       ZATTERA_REQUIRE_THROW( db->push_transaction( tx, 0 ), fc::exception );
 
-      BOOST_REQUIRE( new_bob.balance.amount.value == ASSET( "3.000 TTR" ).amount.value );
-      BOOST_REQUIRE( new_bob.zbd_balance.amount.value == ASSET( "7.000 TBD" ).amount.value );
+      BOOST_REQUIRE( new_bob.liquid_balance.amount.value == ASSET( "3.000 TTR" ).amount.value );
+      BOOST_REQUIRE( new_bob.dollar_balance.amount.value == ASSET( "7.000 TBD" ).amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test failure when account does not have the required TBD" );
@@ -135,8 +135,8 @@ BOOST_AUTO_TEST_CASE( apply_convert )
       tx.sign( alice_private_key, db->get_chain_id() );
       ZATTERA_REQUIRE_THROW( db->push_transaction( tx, 0 ), fc::exception );
 
-      BOOST_REQUIRE( new_alice.balance.amount.value == ASSET( "7.500 TTR" ).amount.value );
-      BOOST_REQUIRE( new_alice.zbd_balance.amount.value == ASSET( "2.500 TBD" ).amount.value );
+      BOOST_REQUIRE( new_alice.liquid_balance.amount.value == ASSET( "7.500 TTR" ).amount.value );
+      BOOST_REQUIRE( new_alice.dollar_balance.amount.value == ASSET( "2.500 TBD" ).amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test failure when account does not exist" );
@@ -157,8 +157,8 @@ BOOST_AUTO_TEST_CASE( apply_convert )
       tx.sign( bob_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( new_bob.balance.amount.value == ASSET( "3.000 TTR" ).amount.value );
-      BOOST_REQUIRE( new_bob.zbd_balance.amount.value == ASSET( "4.000 TBD" ).amount.value );
+      BOOST_REQUIRE( new_bob.liquid_balance.amount.value == ASSET( "3.000 TTR" ).amount.value );
+      BOOST_REQUIRE( new_bob.dollar_balance.amount.value == ASSET( "4.000 TBD" ).amount.value );
 
       auto convert_request = convert_request_idx.find( std::make_tuple( op.owner, op.requestid ) );
       BOOST_REQUIRE( convert_request != convert_request_idx.end() );
@@ -176,8 +176,8 @@ BOOST_AUTO_TEST_CASE( apply_convert )
       tx.sign( alice_private_key, db->get_chain_id() );
       ZATTERA_REQUIRE_THROW( db->push_transaction( tx, 0 ), fc::exception );
 
-      BOOST_REQUIRE( new_bob.balance.amount.value == ASSET( "3.000 TTR" ).amount.value );
-      BOOST_REQUIRE( new_bob.zbd_balance.amount.value == ASSET( "4.000 TBD" ).amount.value );
+      BOOST_REQUIRE( new_bob.liquid_balance.amount.value == ASSET( "3.000 TTR" ).amount.value );
+      BOOST_REQUIRE( new_bob.dollar_balance.amount.value == ASSET( "4.000 TBD" ).amount.value );
 
       convert_request = convert_request_idx.find( std::make_tuple( op.owner, op.requestid ) );
       BOOST_REQUIRE( convert_request != convert_request_idx.end() );
@@ -293,8 +293,8 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation )
       ZATTERA_REQUIRE_THROW( db->push_transaction( tx, 0 ), fc::exception );
 
       BOOST_REQUIRE( limit_order_idx.find( std::make_tuple( "bob", op.orderid ) ) == limit_order_idx.end() );
-      BOOST_REQUIRE( bob.balance.amount.value == ASSET( "0.000 TTR" ).amount.value );
-      BOOST_REQUIRE( bob.zbd_balance.amount.value == ASSET( "1000.000 TBD" ).amount.value );
+      BOOST_REQUIRE( bob.liquid_balance.amount.value == ASSET( "0.000 TTR" ).amount.value );
+      BOOST_REQUIRE( bob.dollar_balance.amount.value == ASSET( "1000.000 TBD" ).amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test failure when amount to receive is 0" );
@@ -308,8 +308,8 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation )
       ZATTERA_REQUIRE_THROW( db->push_transaction( tx, 0 ), fc::exception );
 
       BOOST_REQUIRE( limit_order_idx.find( std::make_tuple( "alice", op.orderid ) ) == limit_order_idx.end() );
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "1000.000 TTR" ).amount.value );
-      BOOST_REQUIRE( alice.zbd_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "1000.000 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test failure when amount to sell is 0" );
@@ -323,8 +323,8 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation )
       ZATTERA_REQUIRE_THROW( db->push_transaction( tx, 0 ), fc::exception );
 
       BOOST_REQUIRE( limit_order_idx.find( std::make_tuple( "alice", op.orderid ) ) == limit_order_idx.end() );
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "1000.000 TTR" ).amount.value );
-      BOOST_REQUIRE( alice.zbd_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "1000.000 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test failure when expiration is too long" );
@@ -353,8 +353,8 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation )
       BOOST_REQUIRE( limit_order->for_sale == op.amount_to_sell.amount );
       BOOST_REQUIRE( limit_order->sell_price == price( op.amount_to_sell / op.min_to_receive ) );
       BOOST_REQUIRE( limit_order->get_market() == std::make_pair( ZBD_SYMBOL, ZTR_SYMBOL ) );
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
-      BOOST_REQUIRE( alice.zbd_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test failure creating limit order with duplicate id" );
@@ -373,8 +373,8 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation )
       BOOST_REQUIRE( limit_order->for_sale == 10000 );
       BOOST_REQUIRE( limit_order->sell_price == price( ASSET( "10.000 TTR" ), op.min_to_receive ) );
       BOOST_REQUIRE( limit_order->get_market() == std::make_pair( ZBD_SYMBOL, ZTR_SYMBOL ) );
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
-      BOOST_REQUIRE( alice.zbd_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test sucess killing an order that will not be filled" );
@@ -388,8 +388,8 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation )
       ZATTERA_REQUIRE_THROW( db->push_transaction( tx, 0 ), fc::exception );
 
       BOOST_REQUIRE( limit_order_idx.find( std::make_tuple( "alice", op.orderid ) ) == limit_order_idx.end() );
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
-      BOOST_REQUIRE( alice.zbd_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test having a partial match to limit order" );
@@ -418,10 +418,10 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation )
       BOOST_REQUIRE( limit_order->sell_price == price( ASSET( "10.000 TTR" ), ASSET( "15.000 TBD" ) ) );
       BOOST_REQUIRE( limit_order->get_market() == std::make_pair( ZBD_SYMBOL, ZTR_SYMBOL ) );
       BOOST_REQUIRE( limit_order_idx.find( std::make_tuple( "bob", op.orderid ) ) == limit_order_idx.end() );
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
-      BOOST_REQUIRE( alice.zbd_balance.amount.value == ASSET( "7.500 TBD" ).amount.value );
-      BOOST_REQUIRE( bob.balance.amount.value == ASSET( "5.000 TTR" ).amount.value );
-      BOOST_REQUIRE( bob.zbd_balance.amount.value == ASSET( "992.500 TBD" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "7.500 TBD" ).amount.value );
+      BOOST_REQUIRE( bob.liquid_balance.amount.value == ASSET( "5.000 TTR" ).amount.value );
+      BOOST_REQUIRE( bob.dollar_balance.amount.value == ASSET( "992.500 TBD" ).amount.value );
       BOOST_REQUIRE( fill_order_op.open_owner == "alice" );
       BOOST_REQUIRE( fill_order_op.open_orderid == 1 );
       BOOST_REQUIRE( fill_order_op.open_pays.amount.value == ASSET( "5.000 TTR").amount.value );
@@ -448,10 +448,10 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation )
       BOOST_REQUIRE( limit_order->sell_price == price( ASSET( "15.000 TBD" ), ASSET( "10.000 TTR" ) ) );
       BOOST_REQUIRE( limit_order->get_market() == std::make_pair( ZBD_SYMBOL, ZTR_SYMBOL ) );
       BOOST_REQUIRE( limit_order_idx.find( std::make_tuple( "alice", 1 ) ) == limit_order_idx.end() );
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
-      BOOST_REQUIRE( alice.zbd_balance.amount.value == ASSET( "15.000 TBD" ).amount.value );
-      BOOST_REQUIRE( bob.balance.amount.value == ASSET( "10.000 TTR" ).amount.value );
-      BOOST_REQUIRE( bob.zbd_balance.amount.value == ASSET( "977.500 TBD" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "15.000 TBD" ).amount.value );
+      BOOST_REQUIRE( bob.liquid_balance.amount.value == ASSET( "10.000 TTR" ).amount.value );
+      BOOST_REQUIRE( bob.dollar_balance.amount.value == ASSET( "977.500 TBD" ).amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test filling an existing order and new order fully" );
@@ -468,10 +468,10 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation )
 
       BOOST_REQUIRE( limit_order_idx.find( std::make_tuple( "alice", 3 ) ) == limit_order_idx.end() );
       BOOST_REQUIRE( limit_order_idx.find( std::make_tuple( "bob", 1 ) ) == limit_order_idx.end() );
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "985.000 TTR" ).amount.value );
-      BOOST_REQUIRE( alice.zbd_balance.amount.value == ASSET( "22.500 TBD" ).amount.value );
-      BOOST_REQUIRE( bob.balance.amount.value == ASSET( "15.000 TTR" ).amount.value );
-      BOOST_REQUIRE( bob.zbd_balance.amount.value == ASSET( "977.500 TBD" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "985.000 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "22.500 TBD" ).amount.value );
+      BOOST_REQUIRE( bob.liquid_balance.amount.value == ASSET( "15.000 TTR" ).amount.value );
+      BOOST_REQUIRE( bob.dollar_balance.amount.value == ASSET( "977.500 TBD" ).amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test filling limit order with better order when partial order is better." );
@@ -504,10 +504,10 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation )
       BOOST_REQUIRE( limit_order->for_sale.value == 1000 );
       BOOST_REQUIRE( limit_order->sell_price == price( ASSET( "12.000 TBD" ), ASSET( "10.000 TTR" ) ) );
       BOOST_REQUIRE( limit_order->get_market() == std::make_pair( ZBD_SYMBOL, ZTR_SYMBOL ) );
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "975.000 TTR" ).amount.value );
-      BOOST_REQUIRE( alice.zbd_balance.amount.value == ASSET( "33.500 TBD" ).amount.value );
-      BOOST_REQUIRE( bob.balance.amount.value == ASSET( "25.000 TTR" ).amount.value );
-      BOOST_REQUIRE( bob.zbd_balance.amount.value == ASSET( "965.500 TBD" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "975.000 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "33.500 TBD" ).amount.value );
+      BOOST_REQUIRE( bob.liquid_balance.amount.value == ASSET( "25.000 TTR" ).amount.value );
+      BOOST_REQUIRE( bob.dollar_balance.amount.value == ASSET( "965.500 TBD" ).amount.value );
       validate_database();
 
       limit_order_cancel_operation can;
@@ -522,7 +522,7 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation )
       BOOST_TEST_MESSAGE( "--- Test filling limit order with better order when partial order is worse." );
 
       //auto gpo = db->get_dynamic_global_properties();
-      //auto start_zbd = gpo.current_zbd_supply;
+      //auto start_dollar = gpo.current_dollar_supply;
 
       op.owner = "alice";
       op.orderid = 5;
@@ -552,10 +552,10 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation )
       BOOST_REQUIRE( limit_order->for_sale.value == 9091 );
       BOOST_REQUIRE( limit_order->sell_price == price( ASSET( "20.000 TTR" ), ASSET( "22.000 TBD" ) ) );
       BOOST_REQUIRE( limit_order->get_market() == std::make_pair( ZBD_SYMBOL, ZTR_SYMBOL ) );
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "955.000 TTR" ).amount.value );
-      BOOST_REQUIRE( alice.zbd_balance.amount.value == ASSET( "45.500 TBD" ).amount.value );
-      BOOST_REQUIRE( bob.balance.amount.value == ASSET( "35.909 TTR" ).amount.value );
-      BOOST_REQUIRE( bob.zbd_balance.amount.value == ASSET( "954.500 TBD" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "955.000 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "45.500 TBD" ).amount.value );
+      BOOST_REQUIRE( bob.liquid_balance.amount.value == ASSET( "35.909 TTR" ).amount.value );
+      BOOST_REQUIRE( bob.dollar_balance.amount.value == ASSET( "954.500 TBD" ).amount.value );
       validate_database();
    }
    FC_LOG_AND_RETHROW()
@@ -638,8 +638,8 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation2 )
       ZATTERA_REQUIRE_THROW( db->push_transaction( tx, 0 ), fc::exception );
 
       BOOST_REQUIRE( limit_order_idx.find( std::make_tuple( "bob", op.orderid ) ) == limit_order_idx.end() );
-      BOOST_REQUIRE( bob.balance.amount.value == ASSET( "0.000 TTR" ).amount.value );
-      BOOST_REQUIRE( bob.zbd_balance.amount.value == ASSET( "1000.000 TBD" ).amount.value );
+      BOOST_REQUIRE( bob.liquid_balance.amount.value == ASSET( "0.000 TTR" ).amount.value );
+      BOOST_REQUIRE( bob.dollar_balance.amount.value == ASSET( "1000.000 TBD" ).amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test failure when price is 0" );
@@ -673,8 +673,8 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation2 )
       ZATTERA_REQUIRE_THROW( db->push_transaction( tx, 0 ), fc::exception );
 
       BOOST_REQUIRE( limit_order_idx.find( std::make_tuple( "alice", op.orderid ) ) == limit_order_idx.end() );
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "1000.000 TTR" ).amount.value );
-      BOOST_REQUIRE( alice.zbd_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "1000.000 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test failure when amount to sell is 0" );
@@ -688,8 +688,8 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation2 )
       ZATTERA_REQUIRE_THROW( db->push_transaction( tx, 0 ), fc::exception );
 
       BOOST_REQUIRE( limit_order_idx.find( std::make_tuple( "alice", op.orderid ) ) == limit_order_idx.end() );
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "1000.000 TTR" ).amount.value );
-      BOOST_REQUIRE( alice.zbd_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "1000.000 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test failure when expiration is too long" );
@@ -718,8 +718,8 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation2 )
       BOOST_REQUIRE( limit_order->for_sale == op.amount_to_sell.amount );
       BOOST_REQUIRE( limit_order->sell_price == op.exchange_rate );
       BOOST_REQUIRE( limit_order->get_market() == std::make_pair( ZBD_SYMBOL, ZTR_SYMBOL ) );
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
-      BOOST_REQUIRE( alice.zbd_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test failure creating limit order with duplicate id" );
@@ -738,8 +738,8 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation2 )
       BOOST_REQUIRE( limit_order->for_sale == 10000 );
       BOOST_REQUIRE( limit_order->sell_price == op.exchange_rate );
       BOOST_REQUIRE( limit_order->get_market() == std::make_pair( ZBD_SYMBOL, ZTR_SYMBOL ) );
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
-      BOOST_REQUIRE( alice.zbd_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test sucess killing an order that will not be filled" );
@@ -753,8 +753,8 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation2 )
       ZATTERA_REQUIRE_THROW( db->push_transaction( tx, 0 ), fc::exception );
 
       BOOST_REQUIRE( limit_order_idx.find( std::make_tuple( "alice", op.orderid ) ) == limit_order_idx.end() );
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
-      BOOST_REQUIRE( alice.zbd_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test having a partial match to limit order" );
@@ -783,10 +783,10 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation2 )
       BOOST_REQUIRE( limit_order->sell_price == price( ASSET( "2.000 TTR" ), ASSET( "3.000 TBD" ) ) );
       BOOST_REQUIRE( limit_order->get_market() == std::make_pair( ZBD_SYMBOL, ZTR_SYMBOL ) );
       BOOST_REQUIRE( limit_order_idx.find( std::make_tuple( "bob", op.orderid ) ) == limit_order_idx.end() );
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
-      BOOST_REQUIRE( alice.zbd_balance.amount.value == ASSET( "7.500 TBD" ).amount.value );
-      BOOST_REQUIRE( bob.balance.amount.value == ASSET( "5.000 TTR" ).amount.value );
-      BOOST_REQUIRE( bob.zbd_balance.amount.value == ASSET( "992.500 TBD" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "7.500 TBD" ).amount.value );
+      BOOST_REQUIRE( bob.liquid_balance.amount.value == ASSET( "5.000 TTR" ).amount.value );
+      BOOST_REQUIRE( bob.dollar_balance.amount.value == ASSET( "992.500 TBD" ).amount.value );
       BOOST_REQUIRE( fill_order_op.open_owner == "alice" );
       BOOST_REQUIRE( fill_order_op.open_orderid == 1 );
       BOOST_REQUIRE( fill_order_op.open_pays.amount.value == ASSET( "5.000 TTR").amount.value );
@@ -813,10 +813,10 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation2 )
       BOOST_REQUIRE( limit_order->sell_price == price( ASSET( "3.000 TBD" ), ASSET( "2.000 TTR" ) ) );
       BOOST_REQUIRE( limit_order->get_market() == std::make_pair( ZBD_SYMBOL, ZTR_SYMBOL ) );
       BOOST_REQUIRE( limit_order_idx.find( std::make_tuple( "alice", 1 ) ) == limit_order_idx.end() );
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
-      BOOST_REQUIRE( alice.zbd_balance.amount.value == ASSET( "15.000 TBD" ).amount.value );
-      BOOST_REQUIRE( bob.balance.amount.value == ASSET( "10.000 TTR" ).amount.value );
-      BOOST_REQUIRE( bob.zbd_balance.amount.value == ASSET( "977.500 TBD" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "15.000 TBD" ).amount.value );
+      BOOST_REQUIRE( bob.liquid_balance.amount.value == ASSET( "10.000 TTR" ).amount.value );
+      BOOST_REQUIRE( bob.dollar_balance.amount.value == ASSET( "977.500 TBD" ).amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test filling an existing order and new order fully" );
@@ -833,10 +833,10 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation2 )
 
       BOOST_REQUIRE( limit_order_idx.find( std::make_tuple( "alice", 3 ) ) == limit_order_idx.end() );
       BOOST_REQUIRE( limit_order_idx.find( std::make_tuple( "bob", 1 ) ) == limit_order_idx.end() );
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "985.000 TTR" ).amount.value );
-      BOOST_REQUIRE( alice.zbd_balance.amount.value == ASSET( "22.500 TBD" ).amount.value );
-      BOOST_REQUIRE( bob.balance.amount.value == ASSET( "15.000 TTR" ).amount.value );
-      BOOST_REQUIRE( bob.zbd_balance.amount.value == ASSET( "977.500 TBD" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "985.000 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "22.500 TBD" ).amount.value );
+      BOOST_REQUIRE( bob.liquid_balance.amount.value == ASSET( "15.000 TTR" ).amount.value );
+      BOOST_REQUIRE( bob.dollar_balance.amount.value == ASSET( "977.500 TBD" ).amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test filling limit order with better order when partial order is better." );
@@ -869,10 +869,10 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation2 )
       BOOST_REQUIRE( limit_order->for_sale.value == 1000 );
       BOOST_REQUIRE( limit_order->sell_price == op.exchange_rate );
       BOOST_REQUIRE( limit_order->get_market() == std::make_pair( ZBD_SYMBOL, ZTR_SYMBOL ) );
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "975.000 TTR" ).amount.value );
-      BOOST_REQUIRE( alice.zbd_balance.amount.value == ASSET( "33.500 TBD" ).amount.value );
-      BOOST_REQUIRE( bob.balance.amount.value == ASSET( "25.000 TTR" ).amount.value );
-      BOOST_REQUIRE( bob.zbd_balance.amount.value == ASSET( "965.500 TBD" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "975.000 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "33.500 TBD" ).amount.value );
+      BOOST_REQUIRE( bob.liquid_balance.amount.value == ASSET( "25.000 TTR" ).amount.value );
+      BOOST_REQUIRE( bob.dollar_balance.amount.value == ASSET( "965.500 TBD" ).amount.value );
       validate_database();
 
       limit_order_cancel_operation can;
@@ -887,7 +887,7 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation2 )
       BOOST_TEST_MESSAGE( "--- Test filling limit order with better order when partial order is worse." );
 
       //auto gpo = db->get_dynamic_global_properties();
-      //auto start_zbd = gpo.current_zbd_supply;
+      //auto start_dollar = gpo.current_dollar_supply;
 
       op.owner = "alice";
       op.orderid = 5;
@@ -917,10 +917,10 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation2 )
       BOOST_REQUIRE( limit_order->for_sale.value == 9091 );
       BOOST_REQUIRE( limit_order->sell_price == price( ASSET( "1.000 TTR" ), ASSET( "1.100 TBD" ) ) );
       BOOST_REQUIRE( limit_order->get_market() == std::make_pair( ZBD_SYMBOL, ZTR_SYMBOL ) );
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "955.000 TTR" ).amount.value );
-      BOOST_REQUIRE( alice.zbd_balance.amount.value == ASSET( "45.500 TBD" ).amount.value );
-      BOOST_REQUIRE( bob.balance.amount.value == ASSET( "35.909 TTR" ).amount.value );
-      BOOST_REQUIRE( bob.zbd_balance.amount.value == ASSET( "954.500 TBD" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "955.000 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "45.500 TBD" ).amount.value );
+      BOOST_REQUIRE( bob.liquid_balance.amount.value == ASSET( "35.909 TTR" ).amount.value );
+      BOOST_REQUIRE( bob.dollar_balance.amount.value == ASSET( "954.500 TBD" ).amount.value );
 
       BOOST_TEST_MESSAGE( "--- Test filling best order with multiple matches." );
       ACTORS( (sam)(dave) )
@@ -1114,8 +1114,8 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_cancel )
       db->push_transaction( tx, 0 );
 
       BOOST_REQUIRE( limit_order_idx.find( std::make_tuple( "alice", 5 ) ) == limit_order_idx.end() );
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "10.000 TTR" ).amount.value );
-      BOOST_REQUIRE( alice.zbd_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "10.000 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
    }
    FC_LOG_AND_RETHROW()
 }
@@ -1156,8 +1156,8 @@ BOOST_AUTO_TEST_CASE( process_convert_delay )
       auto convert_request = convert_request_idx.find( std::make_tuple( "alice", 2 ) );
 
       BOOST_REQUIRE( convert_request != convert_request_idx.end() );
-      BOOST_REQUIRE( alice_2.balance.amount.value == 0 );
-      BOOST_REQUIRE( alice_2.zbd_balance.amount.value == ( start_balance - op.amount ).amount.value );
+      BOOST_REQUIRE( alice_2.liquid_balance.amount.value == 0 );
+      BOOST_REQUIRE( alice_2.dollar_balance.amount.value == ( start_balance - op.amount ).amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "Generate one more block" );
@@ -1169,8 +1169,8 @@ BOOST_AUTO_TEST_CASE( process_convert_delay )
 
       convert_request = convert_request_idx.find( std::make_tuple( "alice", 2 ) );
       BOOST_REQUIRE( convert_request == convert_request_idx.end() );
-      BOOST_REQUIRE( alice_3.balance.amount.value == 2500 );
-      BOOST_REQUIRE( alice_3.zbd_balance.amount.value == ( start_balance - op.amount ).amount.value );
+      BOOST_REQUIRE( alice_3.liquid_balance.amount.value == 2500 );
+      BOOST_REQUIRE( alice_3.dollar_balance.amount.value == ( start_balance - op.amount ).amount.value );
       BOOST_REQUIRE( vop.owner == "alice" );
       BOOST_REQUIRE( vop.requestid == 2 );
       BOOST_REQUIRE( vop.amount_in.amount.value == ASSET( "2.000 TBD" ).amount.value );
@@ -1180,7 +1180,7 @@ BOOST_AUTO_TEST_CASE( process_convert_delay )
    FC_LOG_AND_RETHROW();
 }
 
-BOOST_AUTO_TEST_CASE( calculate_zbd_interest )
+BOOST_AUTO_TEST_CASE( calculate_dollar_interest )
 {
    try
    {
@@ -1198,8 +1198,8 @@ BOOST_AUTO_TEST_CASE( calculate_zbd_interest )
 
       fund( "alice", ASSET( "31.903 TBD" ) );
 
-      auto start_time = db->get_account( "alice" ).zbd_seconds_last_update;
-      auto alice_zbd = db->get_account( "alice" ).zbd_balance;
+      auto start_time = db->get_account( "alice" ).dollar_seconds_last_update;
+      auto alice_dollar = db->get_account( "alice" ).dollar_balance;
 
       generate_blocks( db->head_block_time() + fc::seconds( ZATTERA_ZBD_INTEREST_COMPOUND_INTERVAL_SEC ), true );
 
@@ -1217,16 +1217,16 @@ BOOST_AUTO_TEST_CASE( calculate_zbd_interest )
       auto gpo = db->get_dynamic_global_properties();
       auto interest_op = get_last_operations( 1 )[0].get< interest_operation >();
 
-      BOOST_REQUIRE( gpo.zbd_interest_rate > 0 );
-      BOOST_REQUIRE( static_cast<uint64_t>(db->get_account( "alice" ).zbd_balance.amount.value) == alice_zbd.amount.value - ASSET( "1.000 TBD" ).amount.value + ( ( ( ( uint128_t( alice_zbd.amount.value ) * ( db->head_block_time() - start_time ).to_seconds() ) / ZATTERA_SECONDS_PER_YEAR ) * gpo.zbd_interest_rate ) / ZATTERA_100_PERCENT ).to_uint64() );
+      BOOST_REQUIRE( gpo.dollar_interest_rate > 0 );
+      BOOST_REQUIRE( static_cast<uint64_t>(db->get_account( "alice" ).dollar_balance.amount.value) == alice_dollar.amount.value - ASSET( "1.000 TBD" ).amount.value + ( ( ( ( uint128_t( alice_dollar.amount.value ) * ( db->head_block_time() - start_time ).to_seconds() ) / ZATTERA_SECONDS_PER_YEAR ) * gpo.dollar_interest_rate ) / ZATTERA_100_PERCENT ).to_uint64() );
       BOOST_REQUIRE( interest_op.owner == "alice" );
-      BOOST_REQUIRE( interest_op.interest.amount.value == db->get_account( "alice" ).zbd_balance.amount.value - ( alice_zbd.amount.value - ASSET( "1.000 TBD" ).amount.value ) );
+      BOOST_REQUIRE( interest_op.interest.amount.value == db->get_account( "alice" ).dollar_balance.amount.value - ( alice_dollar.amount.value - ASSET( "1.000 TBD" ).amount.value ) );
       validate_database();
 
       BOOST_TEST_MESSAGE( "Testing interest under interest period" );
 
-      start_time = db->get_account( "alice" ).zbd_seconds_last_update;
-      alice_zbd = db->get_account( "alice" ).zbd_balance;
+      start_time = db->get_account( "alice" ).dollar_seconds_last_update;
+      alice_dollar = db->get_account( "alice" ).dollar_balance;
 
       generate_blocks( db->head_block_time() + fc::seconds( ZATTERA_ZBD_INTEREST_COMPOUND_INTERVAL_SEC / 2 ), true );
 
@@ -1237,12 +1237,12 @@ BOOST_AUTO_TEST_CASE( calculate_zbd_interest )
       tx.sign( alice_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_account( "alice" ).zbd_balance.amount.value == alice_zbd.amount.value - ASSET( "1.000 TBD" ).amount.value );
+      BOOST_REQUIRE( db->get_account( "alice" ).dollar_balance.amount.value == alice_dollar.amount.value - ASSET( "1.000 TBD" ).amount.value );
       validate_database();
 
-      auto alice_coindays = uint128_t( alice_zbd.amount.value ) * ( db->head_block_time() - start_time ).to_seconds();
-      alice_zbd = db->get_account( "alice" ).zbd_balance;
-      start_time = db->get_account( "alice" ).zbd_seconds_last_update;
+      auto alice_coindays = uint128_t( alice_dollar.amount.value ) * ( db->head_block_time() - start_time ).to_seconds();
+      alice_dollar = db->get_account( "alice" ).dollar_balance;
+      start_time = db->get_account( "alice" ).dollar_seconds_last_update;
 
       BOOST_TEST_MESSAGE( "Testing longer interest period" );
 
@@ -1255,7 +1255,7 @@ BOOST_AUTO_TEST_CASE( calculate_zbd_interest )
       tx.sign( alice_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( static_cast<uint64_t>(db->get_account( "alice" ).zbd_balance.amount.value) == alice_zbd.amount.value - ASSET( "1.000 TBD" ).amount.value + ( ( ( ( uint128_t( alice_zbd.amount.value ) * ( db->head_block_time() - start_time ).to_seconds() + alice_coindays ) / ZATTERA_SECONDS_PER_YEAR ) * gpo.zbd_interest_rate ) / ZATTERA_100_PERCENT ).to_uint64() );
+      BOOST_REQUIRE( static_cast<uint64_t>(db->get_account( "alice" ).dollar_balance.amount.value) == alice_dollar.amount.value - ASSET( "1.000 TBD" ).amount.value + ( ( ( ( uint128_t( alice_dollar.amount.value ) * ( db->head_block_time() - start_time ).to_seconds() + alice_coindays ) / ZATTERA_SECONDS_PER_YEAR ) * gpo.dollar_interest_rate ) / ZATTERA_100_PERCENT ).to_uint64() );
       validate_database();
    }
    FC_LOG_AND_RETHROW();
@@ -1263,13 +1263,13 @@ BOOST_AUTO_TEST_CASE( calculate_zbd_interest )
 
 #ifndef DEBUG
 
-BOOST_AUTO_TEST_CASE( maintain_zbd_stability )
+BOOST_AUTO_TEST_CASE( maintain_dollar_stability )
 {
    try
    {
       resize_shared_mem( 1024 * 1024 * 512 ); // Due to number of blocks in the test, it requires a large file. (64 MB)
 
-      auto zbd_initial_supply = db->get_dynamic_global_properties().current_zbd_supply;
+      auto dollar_initial_supply = db->get_dynamic_global_properties().current_dollar_supply;
       auto debug_key = "5JdouSvkK75TKWrJixYufQgePT21V7BAVWbNUWt3ktqhPmy8Z78"; //get_dev_key debug node
 
       ACTORS( (alice)(bob)(sam)(dave)(greg) );
@@ -1283,7 +1283,7 @@ BOOST_AUTO_TEST_CASE( maintain_zbd_stability )
       auto exchange_rate = price( ASSET( "1.000 TBD" ), ASSET( "10.000 TTR" ) );
       set_price_feed( exchange_rate );
 
-      BOOST_REQUIRE( db->get_dynamic_global_properties().zbd_print_rate == ZATTERA_100_PERCENT );
+      BOOST_REQUIRE( db->get_dynamic_global_properties().dollar_print_rate == ZATTERA_100_PERCENT );
 
       comment_operation comment;
       comment.author = "alice";
@@ -1319,12 +1319,12 @@ BOOST_AUTO_TEST_CASE( maintain_zbd_stability )
 
       BOOST_TEST_MESSAGE( "Changing sam and gpo to set up market cap conditions" );
 
-      asset zbd_balance = asset( ( gpo.virtual_supply.amount * ( ZATTERA_ZBD_STOP_PERCENT + 30 ) ) / ZATTERA_100_PERCENT, ZTR_SYMBOL ) * exchange_rate;
+      asset dollar_balance = asset( ( gpo.virtual_liquid_supply.amount * ( ZATTERA_ZBD_STOP_PERCENT + 30 ) ) / ZATTERA_100_PERCENT, ZTR_SYMBOL ) * exchange_rate;
       db_plugin->debug_update( [=]( database& db )
       {
          db.modify( db.get_account( "sam" ), [&]( account_object& a )
          {
-            a.zbd_balance = zbd_balance;
+            a.dollar_balance = dollar_balance;
          });
       }, database::skip_witness_signature );
 
@@ -1332,8 +1332,8 @@ BOOST_AUTO_TEST_CASE( maintain_zbd_stability )
       {
          db.modify( db.get_dynamic_global_properties(), [&]( dynamic_global_property_object& gpo )
          {
-            gpo.current_zbd_supply = zbd_initial_supply + zbd_balance;
-            gpo.virtual_supply += zbd_balance * exchange_rate;
+            gpo.current_dollar_supply = dollar_initial_supply + dollar_balance;
+            gpo.virtual_liquid_supply += dollar_balance * exchange_rate;
          });
       }, database::skip_witness_signature );
 
@@ -1341,32 +1341,32 @@ BOOST_AUTO_TEST_CASE( maintain_zbd_stability )
 
       db_plugin->debug_generate_blocks( debug_key, 1, database::skip_witness_signature );
 
-      auto comment_reward = ( gpo.total_reward_fund_ztr.amount + 2000 ) - ( ( gpo.total_reward_fund_ztr.amount + 2000 ) * 25 * ZATTERA_1_PERCENT ) / ZATTERA_100_PERCENT ;
+      auto comment_reward = ( gpo.total_reward_fund_liquid.amount + 2000 ) - ( ( gpo.total_reward_fund_liquid.amount + 2000 ) * 25 * ZATTERA_1_PERCENT ) / ZATTERA_100_PERCENT ;
       comment_reward /= 2;
-      auto zbd_reward = ( comment_reward * gpo.zbd_print_rate ) / ZATTERA_100_PERCENT;
-      auto alice_zbd = db->get_account( "alice" ).zbd_balance + db->get_account( "alice" ).reward_zbd_balance + asset( zbd_reward, ZTR_SYMBOL ) * exchange_rate;
-      auto alice_ztr = db->get_account( "alice" ).balance + db->get_account( "alice" ).reward_ztr_balance ;
+      auto dollar_reward = ( comment_reward * gpo.dollar_print_rate ) / ZATTERA_100_PERCENT;
+      auto alice_dollar = db->get_account( "alice" ).dollar_balance + db->get_account( "alice" ).reward_dollar_balance + asset( dollar_reward, ZTR_SYMBOL ) * exchange_rate;
+      auto alice_liquid = db->get_account( "alice" ).liquid_balance + db->get_account( "alice" ).reward_liquid_balance ;
 
       BOOST_TEST_MESSAGE( "Checking printing ZBD has slowed" );
-      BOOST_REQUIRE( db->get_dynamic_global_properties().zbd_print_rate < ZATTERA_100_PERCENT );
+      BOOST_REQUIRE( db->get_dynamic_global_properties().dollar_print_rate < ZATTERA_100_PERCENT );
 
       BOOST_TEST_MESSAGE( "Pay out comment and check rewards are paid as ZTR" );
       db_plugin->debug_generate_blocks( debug_key, 1, database::skip_witness_signature );
 
       validate_database();
 
-      BOOST_REQUIRE( db->get_account( "alice" ).zbd_balance + db->get_account( "alice" ).reward_zbd_balance == alice_zbd );
-      BOOST_REQUIRE( db->get_account( "alice" ).balance + db->get_account( "alice" ).reward_ztr_balance > alice_ztr );
+      BOOST_REQUIRE( db->get_account( "alice" ).dollar_balance + db->get_account( "alice" ).reward_dollar_balance == alice_dollar );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance + db->get_account( "alice" ).reward_liquid_balance > alice_liquid );
 
       BOOST_TEST_MESSAGE( "Letting percent market cap fall to 2% to verify printing of ZBD turns back on" );
 
       // Get close to 1.5% for printing ZBD to start again, but not all the way
-      asset reduced_zbd_balance = asset( ( 194 * zbd_balance.amount ) / 500, ZBD_SYMBOL );
+      asset reduced_dollar_balance = asset( ( 194 * dollar_balance.amount ) / 500, ZBD_SYMBOL );
       db_plugin->debug_update( [=]( database& db )
       {
          db.modify( db.get_account( "sam" ), [&]( account_object& a )
          {
-            a.zbd_balance = reduced_zbd_balance;
+            a.dollar_balance = reduced_dollar_balance;
          });
       }, database::skip_witness_signature );
 
@@ -1374,37 +1374,37 @@ BOOST_AUTO_TEST_CASE( maintain_zbd_stability )
       {
          db.modify( db.get_dynamic_global_properties(), [&]( dynamic_global_property_object& gpo )
          {
-            gpo.current_zbd_supply = zbd_initial_supply + alice_zbd + reduced_zbd_balance;
+            gpo.current_dollar_supply = dollar_initial_supply + alice_dollar + reduced_dollar_balance;
          });
       }, database::skip_witness_signature );
 
       db_plugin->debug_generate_blocks( debug_key, 1, database::skip_witness_signature );
       validate_database();
 
-      BOOST_REQUIRE( db->get_dynamic_global_properties().zbd_print_rate < ZATTERA_100_PERCENT );
+      BOOST_REQUIRE( db->get_dynamic_global_properties().dollar_print_rate < ZATTERA_100_PERCENT );
 
-      auto last_print_rate = db->get_dynamic_global_properties().zbd_print_rate;
+      auto last_print_rate = db->get_dynamic_global_properties().dollar_print_rate;
 
       // Keep producing blocks until printing ZBD is back
-      while( ( db->get_dynamic_global_properties().current_zbd_supply * exchange_rate ).amount >= ( db->get_dynamic_global_properties().virtual_supply.amount * ZATTERA_ZBD_START_PERCENT ) / ZATTERA_100_PERCENT )
+      while( ( db->get_dynamic_global_properties().current_dollar_supply * exchange_rate ).amount >= ( db->get_dynamic_global_properties().virtual_liquid_supply.amount * ZATTERA_ZBD_START_PERCENT ) / ZATTERA_100_PERCENT )
       {
          auto& gpo = db->get_dynamic_global_properties();
-         BOOST_REQUIRE( gpo.zbd_print_rate >= last_print_rate );
-         last_print_rate = gpo.zbd_print_rate;
+         BOOST_REQUIRE( gpo.dollar_print_rate >= last_print_rate );
+         last_print_rate = gpo.dollar_print_rate;
          db_plugin->debug_generate_blocks( debug_key, 1, database::skip_witness_signature );
          validate_database();
       }
 
       validate_database();
 
-      BOOST_REQUIRE( db->get_dynamic_global_properties().zbd_print_rate == ZATTERA_100_PERCENT );
+      BOOST_REQUIRE( db->get_dynamic_global_properties().dollar_print_rate == ZATTERA_100_PERCENT );
    }
    FC_LOG_AND_RETHROW()
 }
 
 #endif
 
-BOOST_AUTO_TEST_CASE( enforce_zbd_price_feed_limit )
+BOOST_AUTO_TEST_CASE( enforce_dollar_price_feed_limit )
 {
    try
    {
@@ -1441,7 +1441,7 @@ BOOST_AUTO_TEST_CASE( enforce_zbd_price_feed_limit )
 
       db->skip_price_feed_limit_check = false;
       const auto& gpo = db->get_dynamic_global_properties();
-      auto new_exchange_rate = price( gpo.current_zbd_supply, asset( ( ZATTERA_100_PERCENT ) * gpo.current_supply.amount, ZTR_SYMBOL ) );
+      auto new_exchange_rate = price( gpo.current_dollar_supply, asset( ( ZATTERA_100_PERCENT ) * gpo.current_liquid_supply.amount, ZTR_SYMBOL ) );
       set_price_feed( new_exchange_rate );
       set_price_feed( new_exchange_rate );
 

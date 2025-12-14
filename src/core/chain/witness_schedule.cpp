@@ -52,12 +52,12 @@ void update_median_witness_props( database& db )
    } );
    uint32_t median_maximum_block_size = active[active.size()/2]->props.maximum_block_size;
 
-   /// sort them by zbd_interest_rate
+   /// sort them by dollar_interest_rate
    std::sort( active.begin(), active.end(), [&]( const witness_object* a, const witness_object* b )
    {
-      return a->props.zbd_interest_rate < b->props.zbd_interest_rate;
+      return a->props.dollar_interest_rate < b->props.dollar_interest_rate;
    } );
-   uint16_t median_zbd_interest_rate = active[active.size()/2]->props.zbd_interest_rate;
+   uint16_t median_dollar_interest_rate = active[active.size()/2]->props.dollar_interest_rate;
 
    /// sort them by account_subsidy_limit
    std::sort( active.begin(), active.end(), [&]( const witness_object* a, const witness_object* b )
@@ -70,14 +70,14 @@ void update_median_witness_props( database& db )
    {
       _wso.median_props.account_creation_fee    = median_account_creation_fee;
       _wso.median_props.maximum_block_size      = median_maximum_block_size;
-      _wso.median_props.zbd_interest_rate       = median_zbd_interest_rate;
+      _wso.median_props.dollar_interest_rate       = median_dollar_interest_rate;
       _wso.median_props.account_subsidy_limit   = median_account_subsidy_limit;
    } );
 
    db.modify( db.get_dynamic_global_properties(), [&]( dynamic_global_property_object& _dgpo )
    {
       _dgpo.maximum_block_size = median_maximum_block_size;
-      _dgpo.zbd_interest_rate  = median_zbd_interest_rate;
+      _dgpo.dollar_interest_rate  = median_dollar_interest_rate;
    } );
 }
 

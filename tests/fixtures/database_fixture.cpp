@@ -124,7 +124,7 @@ void clean_database_fixture::resize_shared_mem( uint64_t size )
       args.data_dir = data_dir->path();
       args.shared_mem_dir = args.data_dir;
       args.initial_supply = TEST_INITIAL_SUPPLY;
-      args.zbd_initial_supply = TEST_ZBD_INITIAL_SUPPLY;
+      args.dollar_initial_supply = TEST_ZBD_INITIAL_SUPPLY;
       args.shared_file_size = size;
       db->open( args );
    }
@@ -228,7 +228,7 @@ void database_fixture::open_database()
       args.data_dir = data_dir->path();
       args.shared_mem_dir = args.data_dir;
       args.initial_supply = TEST_INITIAL_SUPPLY;
-      args.zbd_initial_supply = TEST_ZBD_INITIAL_SUPPLY;
+      args.dollar_initial_supply = TEST_ZBD_INITIAL_SUPPLY;
       args.shared_file_size = 1024 * 1024 * 1024;   // 512MB file for testing (avoid OOM on long test runs)
       db->open(args);
    }
@@ -370,20 +370,20 @@ void database_fixture::fund(
          db.modify( db.get_account( account_name ), [&]( account_object& a )
          {
             if( amount.symbol == ZTR_SYMBOL )
-               a.balance += amount;
+               a.liquid_balance += amount;
             else if( amount.symbol == ZBD_SYMBOL )
             {
-               a.zbd_balance += amount;
-               a.zbd_seconds_last_update = db.head_block_time();
+               a.dollar_balance += amount;
+               a.dollar_seconds_last_update = db.head_block_time();
             }
          });
 
          db.modify( db.get_dynamic_global_properties(), [&]( dynamic_global_property_object& gpo )
          {
             if( amount.symbol == ZTR_SYMBOL )
-               gpo.current_supply += amount;
+               gpo.current_liquid_supply += amount;
             else if( amount.symbol == ZBD_SYMBOL )
-               gpo.current_zbd_supply += amount;
+               gpo.current_dollar_supply += amount;
          });
 
          if( amount.symbol == ZBD_SYMBOL )
@@ -411,16 +411,16 @@ void database_fixture::convert(
       if ( amount.symbol == ZTR_SYMBOL )
       {
          db->adjust_balance( account_name, -amount );
-         db->adjust_balance( account_name, db->to_zbd( amount ) );
+         db->adjust_balance( account_name, db->to_dollar( amount ) );
          db->adjust_supply( -amount );
-         db->adjust_supply( db->to_zbd( amount ) );
+         db->adjust_supply( db->to_dollar( amount ) );
       }
       else if ( amount.symbol == ZBD_SYMBOL )
       {
          db->adjust_balance( account_name, -amount );
-         db->adjust_balance( account_name, db->to_ztr( amount ) );
+         db->adjust_balance( account_name, db->to_liquid( amount ) );
          db->adjust_supply( -amount );
-         db->adjust_supply( db->to_ztr( amount ) );
+         db->adjust_supply( db->to_liquid( amount ) );
       }
    } FC_CAPTURE_AND_RETHROW( (account_name)(amount) )
 }
@@ -471,7 +471,7 @@ void database_fixture::vest( const string& account, const asset& amount )
    {
       db.modify( db.get_dynamic_global_properties(), [&]( dynamic_global_property_object& gpo )
       {
-         gpo.current_supply += amount;
+         gpo.current_liquid_supply += amount;
       });
 
       db.create_vesting( db.get_account( account ), amount );
@@ -496,7 +496,7 @@ void database_fixture::proxy( const string& account, const string& proxy )
 void database_fixture::set_price_feed( const price& new_price )
 {
    flat_map< string, vector< char > > props;
-   props[ "zbd_exchange_rate" ] = fc::raw::pack_to_vector( new_price );
+   props[ "dollar_exchange_rate" ] = fc::raw::pack_to_vector( new_price );
 
    set_witness_props( props );
 
@@ -532,7 +532,7 @@ void database_fixture::set_witness_props( const flat_map< string, vector< char >
 
 const asset& database_fixture::get_balance( const string& account_name )const
 {
-  return db->get_account( account_name ).balance;
+  return db->get_account( account_name ).liquid_balance;
 }
 
 void database_fixture::sign(signed_transaction& trx, const fc::ecc::private_key& key)

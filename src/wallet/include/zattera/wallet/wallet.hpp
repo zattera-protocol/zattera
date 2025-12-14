@@ -376,7 +376,7 @@ class wallet_api
        *  These accounts are created with combination of ZTR and delegated ZP
        *
        *  @param creator The account creating the new account
-       *  @param ztr_fee The amount of the fee to be paid with ZTR
+       *  @param liquid_fee The amount of the fee to be paid with ZTR
        *  @param delegated_vests The amount of the fee to be paid with delegation
        *  @param new_account_name The name of the new account
        *  @param json_meta JSON Metadata associated with the new account
@@ -384,7 +384,7 @@ class wallet_api
        */
       signed_transaction create_account_delegated(
          string creator,
-         asset ztr_fee,
+         asset liquid_fee,
          asset delegated_vests,
          string new_account_name,
          string json_meta,
@@ -399,7 +399,7 @@ class wallet_api
        * These accounts are created with combination of ZTR and delegated ZP
        *
        * @param creator The account creating the new account
-       * @param ztr_fee The amount of the fee to be paid with ZTR
+       * @param liquid_fee The amount of the fee to be paid with ZTR
        * @param delegated_vests The amount of the fee to be paid with delegation
        * @param newname The name of the new account
        * @param json_meta JSON Metadata associated with the new account
@@ -411,7 +411,7 @@ class wallet_api
        */
       signed_transaction create_account_with_keys_delegated(
          string creator,
-         asset ztr_fee,
+         asset liquid_fee,
          asset delegated_vests,
          string newname,
          string json_meta,
@@ -648,8 +648,8 @@ class wallet_api
        * @param to The account the funds are going to
        * @param agent The account acting as the agent in case of dispute
        * @param escrow_id A unique id for the escrow transfer. (from, escrow_id) must be a unique pair
-       * @param zbd_amount The amount of ZBD to transfer
-       * @param ztr_amount The amount of ZTR to transfer
+       * @param dollar_amount The amount of ZBD to transfer
+       * @param liquid_amount The amount of ZTR to transfer
        * @param fee The fee paid to the agent
        * @param ratification_deadline The deadline for 'to' and 'agent' to approve the escrow transfer
        * @param escrow_expiration The expiration of the escrow transfer, after which either party can claim the funds
@@ -661,8 +661,8 @@ class wallet_api
          string to,
          string agent,
          uint32_t escrow_id,
-         asset zbd_amount,
-         asset ztr_amount,
+         asset dollar_amount,
+         asset liquid_amount,
          asset fee,
          time_point_sec ratification_deadline,
          time_point_sec escrow_expiration,
@@ -720,8 +720,8 @@ class wallet_api
        * @param who The account authorizing the release
        * @param receiver The account that will receive funds being released
        * @param escrow_id A unique id for the escrow transfer
-       * @param zbd_amount The amount of ZBD that will be released
-       * @param ztr_amount The amount of ZTR that will be released
+       * @param dollar_amount The amount of ZBD that will be released
+       * @param liquid_amount The amount of ZTR that will be released
        * @param broadcast true if you wish to broadcast the transaction
        */
       signed_transaction escrow_release(
@@ -731,8 +731,8 @@ class wallet_api
          string who,
          string receiver,
          uint32_t escrow_id,
-         asset zbd_amount,
-         asset ztr_amount,
+         asset dollar_amount,
+         asset liquid_amount,
          bool broadcast = false
       );
 
@@ -828,7 +828,7 @@ class wallet_api
        *  @param amount The amount of ZBD to convert
        *  @param broadcast true if you wish to broadcast the transaction
        */
-      signed_transaction convert_zbd(
+      signed_transaction convert_dollar(
          string from,
          asset amount,
          bool broadcast = false );
@@ -1055,8 +1055,8 @@ class wallet_api
 
       signed_transaction claim_reward_balance(
          string account,
-         asset reward_ztr,
-         asset reward_zbd,
+         asset reward_liquids,
+         asset reward_dollars,
          asset reward_vests,
          bool broadcast );
 };
@@ -1133,7 +1133,7 @@ FC_API( zattera::wallet::wallet_api,
         (transfer_to_vesting)
         (withdraw_vesting)
         (set_withdraw_vesting_route)
-        (convert_zbd)
+        (convert_dollar)
         (publish_feed)
         (get_order_book)
         (get_open_orders)

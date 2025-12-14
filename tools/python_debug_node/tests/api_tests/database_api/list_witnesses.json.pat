@@ -7,17 +7,17 @@
             "id": 0,
             "last_aslot": 0,
             "last_confirmed_block_num": 0,
-            "last_zbd_exchange_update": "1970-01-01T00:00:00",
+            "last_dollar_exchange_update": "1970-01-01T00:00:00",
             "last_work": "0000000000000000000000000000000000000000000000000000000000000000",
             "owner": "genesis",
             "pow_worker": 0,
             "props": {
                 "account_creation_fee": "0.000 TTR",
                 "maximum_block_size": 131072,
-                "zbd_interest_rate": 1000
+                "dollar_interest_rate": 1000
             },
             "running_version": "0.0.0",
-            "zbd_exchange_rate": {
+            "dollar_exchange_rate": {
                 "base": "0.000 TTR",
                 "quote": "0.000 TTR"
             },

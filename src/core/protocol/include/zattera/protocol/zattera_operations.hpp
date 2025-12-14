@@ -223,8 +223,8 @@ namespace zattera { namespace protocol {
       account_name_type agent;
       uint32_t          escrow_id = 30;
 
-      asset             zbd_amount = asset( 0, ZBD_SYMBOL );
-      asset             ztr_amount = asset( 0, ZTR_SYMBOL );
+      asset             dollar_amount = asset( 0, ZBD_SYMBOL );
+      asset             liquid_amount = asset( 0, ZTR_SYMBOL );
       asset             fee;
 
       time_point_sec    ratification_deadline;
@@ -295,8 +295,8 @@ namespace zattera { namespace protocol {
       account_name_type receiver; ///< the account that should receive funds (might be from, might be to)
 
       uint32_t          escrow_id = 30;
-      asset             zbd_amount = asset( 0, ZBD_SYMBOL ); ///< the amount of zbd to release
-      asset             ztr_amount = asset( 0, ZTR_SYMBOL ); ///< the amount of ztr to release
+      asset             dollar_amount = asset( 0, ZBD_SYMBOL ); ///< the amount of zbd to release
+      asset             liquid_amount = asset( 0, ZTR_SYMBOL ); ///< the amount of ztr to release
 
       void validate()const;
       void get_required_active_authorities( flat_set<account_name_type>& a )const{ a.insert(who); }
@@ -379,7 +379,7 @@ namespace zattera { namespace protocol {
        *  to tune rate limiting and capacity
        */
       uint32_t          maximum_block_size = ZATTERA_MIN_BLOCK_SIZE_LIMIT * 2;
-      uint16_t          zbd_interest_rate  = ZATTERA_DEFAULT_ZBD_INTEREST_RATE;
+      uint16_t          dollar_interest_rate  = ZATTERA_DEFAULT_ZBD_INTEREST_RATE;
 
       template< bool force_canon >
       void validate()const
@@ -390,8 +390,8 @@ namespace zattera { namespace protocol {
          }
          FC_ASSERT( account_creation_fee.amount >= ZATTERA_MIN_ACCOUNT_CREATION_FEE);
          FC_ASSERT( maximum_block_size >= ZATTERA_MIN_BLOCK_SIZE_LIMIT);
-         FC_ASSERT( zbd_interest_rate >= 0 );
-         FC_ASSERT( zbd_interest_rate <= ZATTERA_100_PERCENT );
+         FC_ASSERT( dollar_interest_rate >= 0 );
+         FC_ASSERT( dollar_interest_rate <= ZATTERA_100_PERCENT );
       }
    };
 
@@ -523,7 +523,7 @@ namespace zattera { namespace protocol {
 
    /**
     *  Feeds can only be published by the top N witnesses which are included in every round and are
-    *  used to define the exchange rate between ztr and the dollar.
+    *  used to define the exchange rate between liquid and the dollar.
     */
    struct feed_publish_operation : public base_operation
    {
@@ -849,8 +849,8 @@ namespace zattera { namespace protocol {
    struct claim_reward_balance_operation : public base_operation
    {
       account_name_type account;
-      asset             reward_ztr;
-      asset             reward_zbd;
+      asset             reward_liquids;
+      asset             reward_dollars;
       asset             reward_vests;
 
       void get_required_posting_authorities( flat_set< account_name_type >& a )const{ a.insert( account ); }
@@ -892,7 +892,7 @@ FC_REFLECT( zattera::protocol::feed_publish_operation, (publisher)(exchange_rate
 FC_REFLECT( zattera::protocol::legacy_chain_properties,
             (account_creation_fee)
             (maximum_block_size)
-            (zbd_interest_rate)
+            (dollar_interest_rate)
           )
 
 FC_REFLECT( zattera::protocol::account_create_operation,
@@ -950,15 +950,15 @@ FC_REFLECT( zattera::protocol::comment_payout_beneficiaries, (beneficiaries) )
 FC_REFLECT_TYPENAME( zattera::protocol::comment_options_extension )
 FC_REFLECT( zattera::protocol::comment_options_operation, (author)(permlink)(max_accepted_payout)(percent_zattera_dollars)(allow_votes)(allow_curation_rewards)(extensions) )
 
-FC_REFLECT( zattera::protocol::escrow_transfer_operation, (from)(to)(zbd_amount)(ztr_amount)(escrow_id)(agent)(fee)(json_meta)(ratification_deadline)(escrow_expiration) );
+FC_REFLECT( zattera::protocol::escrow_transfer_operation, (from)(to)(dollar_amount)(liquid_amount)(escrow_id)(agent)(fee)(json_meta)(ratification_deadline)(escrow_expiration) );
 FC_REFLECT( zattera::protocol::escrow_approve_operation, (from)(to)(agent)(who)(escrow_id)(approve) );
 FC_REFLECT( zattera::protocol::escrow_dispute_operation, (from)(to)(agent)(who)(escrow_id) );
-FC_REFLECT( zattera::protocol::escrow_release_operation, (from)(to)(agent)(who)(receiver)(escrow_id)(zbd_amount)(ztr_amount) );
+FC_REFLECT( zattera::protocol::escrow_release_operation, (from)(to)(agent)(who)(receiver)(escrow_id)(dollar_amount)(liquid_amount) );
 FC_REFLECT( zattera::protocol::claim_account_operation, (creator)(fee)(extensions) );
 FC_REFLECT( zattera::protocol::create_claimed_account_operation, (creator)(new_account_name)(owner)(active)(posting)(memo_key)(json_metadata)(extensions) );
 FC_REFLECT( zattera::protocol::request_account_recovery_operation, (recovery_account)(account_to_recover)(new_owner_authority)(extensions) );
 FC_REFLECT( zattera::protocol::recover_account_operation, (account_to_recover)(new_owner_authority)(recent_owner_authority)(extensions) );
 FC_REFLECT( zattera::protocol::change_recovery_account_operation, (account_to_recover)(new_recovery_account)(extensions) );
 FC_REFLECT( zattera::protocol::decline_voting_rights_operation, (account)(decline) );
-FC_REFLECT( zattera::protocol::claim_reward_balance_operation, (account)(reward_ztr)(reward_zbd)(reward_vests) )
+FC_REFLECT( zattera::protocol::claim_reward_balance_operation, (account)(reward_liquids)(reward_dollars)(reward_vests) )
 FC_REFLECT( zattera::protocol::delegate_vesting_shares_operation, (delegator)(delegatee)(vesting_shares) );

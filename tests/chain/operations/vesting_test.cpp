@@ -100,10 +100,10 @@ BOOST_AUTO_TEST_CASE( apply_transfer_to_vesting )
 
       const auto& gpo = db->get_dynamic_global_properties();
 
-      BOOST_REQUIRE( alice.balance == ASSET( "10.000 TTR" ) );
+      BOOST_REQUIRE( alice.liquid_balance == ASSET( "10.000 TTR" ) );
 
       auto shares = asset( gpo.total_vesting_shares.amount, VESTS_SYMBOL );
-      auto vests = asset( gpo.total_vesting_fund_ztr.amount, ZTR_SYMBOL );
+      auto vests = asset( gpo.total_vesting_fund_liquid.amount, ZTR_SYMBOL );
       auto alice_shares = alice.vesting_shares;
       auto bob_shares = bob.vesting_shares;
 
@@ -123,9 +123,9 @@ BOOST_AUTO_TEST_CASE( apply_transfer_to_vesting )
       vests += op.amount;
       alice_shares += new_vest;
 
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "2.500 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "2.500 TTR" ).amount.value );
       BOOST_REQUIRE( alice.vesting_shares.amount.value == alice_shares.amount.value );
-      BOOST_REQUIRE( gpo.total_vesting_fund_ztr.amount.value == vests.amount.value );
+      BOOST_REQUIRE( gpo.total_vesting_fund_liquid.amount.value == vests.amount.value );
       BOOST_REQUIRE( gpo.total_vesting_shares.amount.value == shares.amount.value );
       validate_database();
 
@@ -143,21 +143,21 @@ BOOST_AUTO_TEST_CASE( apply_transfer_to_vesting )
       vests += op.amount;
       bob_shares += new_vest;
 
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "0.500 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "0.500 TTR" ).amount.value );
       BOOST_REQUIRE( alice.vesting_shares.amount.value == alice_shares.amount.value );
-      BOOST_REQUIRE( bob.balance.amount.value == ASSET( "0.000 TTR" ).amount.value );
+      BOOST_REQUIRE( bob.liquid_balance.amount.value == ASSET( "0.000 TTR" ).amount.value );
       BOOST_REQUIRE( bob.vesting_shares.amount.value == bob_shares.amount.value );
-      BOOST_REQUIRE( gpo.total_vesting_fund_ztr.amount.value == vests.amount.value );
+      BOOST_REQUIRE( gpo.total_vesting_fund_liquid.amount.value == vests.amount.value );
       BOOST_REQUIRE( gpo.total_vesting_shares.amount.value == shares.amount.value );
       validate_database();
 
       ZATTERA_REQUIRE_THROW( db->push_transaction( tx, database::skip_transaction_dupe_check ), fc::exception );
 
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "0.500 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "0.500 TTR" ).amount.value );
       BOOST_REQUIRE( alice.vesting_shares.amount.value == alice_shares.amount.value );
-      BOOST_REQUIRE( bob.balance.amount.value == ASSET( "0.000 TTR" ).amount.value );
+      BOOST_REQUIRE( bob.liquid_balance.amount.value == ASSET( "0.000 TTR" ).amount.value );
       BOOST_REQUIRE( bob.vesting_shares.amount.value == bob_shares.amount.value );
-      BOOST_REQUIRE( gpo.total_vesting_fund_ztr.amount.value == vests.amount.value );
+      BOOST_REQUIRE( gpo.total_vesting_fund_liquid.amount.value == vests.amount.value );
       BOOST_REQUIRE( gpo.total_vesting_shares.amount.value == shares.amount.value );
       validate_database();
    }
@@ -331,8 +331,8 @@ BOOST_AUTO_TEST_CASE( apply_vesting_withdrawal )
 
          db.modify( db.get_dynamic_global_properties(), [&]( dynamic_global_property_object& gpo )
          {
-            gpo.current_supply += wso.median_props.account_creation_fee - ASSET( "0.001 TTR" ) - gpo.total_vesting_fund_ztr;
-            gpo.total_vesting_fund_ztr = wso.median_props.account_creation_fee - ASSET( "0.001 TTR" );
+            gpo.current_liquid_supply += wso.median_props.account_creation_fee - ASSET( "0.001 TTR" ) - gpo.total_vesting_fund_liquid;
+            gpo.total_vesting_fund_liquid = wso.median_props.account_creation_fee - ASSET( "0.001 TTR" );
          });
 
          db.update_virtual_supply();
@@ -400,7 +400,7 @@ BOOST_AUTO_TEST_CASE( process_vesting_withdrawals )
       auto gpo = db->get_dynamic_global_properties();
 
       BOOST_REQUIRE( db->get_account( "alice" ).vesting_shares.amount.value == ( vesting_shares - withdraw_rate ).amount.value );
-      BOOST_REQUIRE( ( withdraw_rate * gpo.get_vesting_share_price() ).amount.value - db->get_account( "alice" ).balance.amount.value <= 1 ); // Check a range due to differences in the share price
+      BOOST_REQUIRE( ( withdraw_rate * gpo.get_vesting_share_price() ).amount.value - db->get_account( "alice" ).liquid_balance.amount.value <= 1 ); // Check a range due to differences in the share price
       BOOST_REQUIRE( fill_op.from_account == "alice" );
       BOOST_REQUIRE( fill_op.to_account == "alice" );
       BOOST_REQUIRE( fill_op.withdrawn.amount.value == withdraw_rate.amount.value );
@@ -410,7 +410,7 @@ BOOST_AUTO_TEST_CASE( process_vesting_withdrawals )
       BOOST_TEST_MESSAGE( "Generating the rest of the blocks in the withdrawal" );
 
       vesting_shares = db->get_account( "alice" ).vesting_shares;
-      auto balance = db->get_account( "alice" ).balance;
+      auto balance = db->get_account( "alice" ).liquid_balance;
       auto old_next_vesting = db->get_account( "alice" ).next_vesting_withdrawal;
 
       for( int i = 1; i < ZATTERA_VESTING_WITHDRAW_INTERVALS - 1; i++ )
@@ -423,7 +423,7 @@ BOOST_AUTO_TEST_CASE( process_vesting_withdrawals )
          fill_op = get_last_operations( 1 )[0].get< fill_vesting_withdraw_operation >();
 
          BOOST_REQUIRE( alice.vesting_shares.amount.value == ( vesting_shares - withdraw_rate ).amount.value );
-         BOOST_REQUIRE( balance.amount.value + ( withdraw_rate * gpo.get_vesting_share_price() ).amount.value - alice.balance.amount.value <= 1 );
+         BOOST_REQUIRE( balance.amount.value + ( withdraw_rate * gpo.get_vesting_share_price() ).amount.value - alice.liquid_balance.amount.value <= 1 );
          BOOST_REQUIRE( fill_op.from_account == "alice" );
          BOOST_REQUIRE( fill_op.to_account == "alice" );
          BOOST_REQUIRE( fill_op.withdrawn.amount.value == withdraw_rate.amount.value );
@@ -437,7 +437,7 @@ BOOST_AUTO_TEST_CASE( process_vesting_withdrawals )
          validate_database();
 
          vesting_shares = alice.vesting_shares;
-         balance = alice.balance;
+         balance = alice.liquid_balance;
          old_next_vesting = alice.next_vesting_withdrawal;
       }
 
@@ -530,11 +530,11 @@ BOOST_AUTO_TEST_CASE( set_vesting_withdraw_route )
       BOOST_TEST_MESSAGE( "Setting up first withdraw" );
 
       auto vesting_withdraw_rate = alice.vesting_withdraw_rate;
-      auto old_alice_balance = alice.balance;
+      auto old_alice_balance = alice.liquid_balance;
       auto old_alice_vesting = alice.vesting_shares;
-      auto old_bob_balance = bob.balance;
+      auto old_bob_balance = bob.liquid_balance;
       auto old_bob_vesting = bob.vesting_shares;
-      auto old_sam_balance = sam.balance;
+      auto old_sam_balance = sam.liquid_balance;
       auto old_sam_vesting = sam.vesting_shares;
       generate_blocks( alice.next_vesting_withdrawal, true );
 
@@ -544,17 +544,17 @@ BOOST_AUTO_TEST_CASE( set_vesting_withdraw_route )
          const auto& sam = db->get_account( "sam" );
 
          BOOST_REQUIRE( alice.vesting_shares == old_alice_vesting - vesting_withdraw_rate );
-         BOOST_REQUIRE( alice.balance == old_alice_balance + asset( ( vesting_withdraw_rate.amount * ZATTERA_1_PERCENT * 20 ) / ZATTERA_100_PERCENT, VESTS_SYMBOL ) * db->get_dynamic_global_properties().get_vesting_share_price() );
+         BOOST_REQUIRE( alice.liquid_balance == old_alice_balance + asset( ( vesting_withdraw_rate.amount * ZATTERA_1_PERCENT * 20 ) / ZATTERA_100_PERCENT, VESTS_SYMBOL ) * db->get_dynamic_global_properties().get_vesting_share_price() );
          BOOST_REQUIRE( bob.vesting_shares == old_bob_vesting + asset( ( vesting_withdraw_rate.amount * ZATTERA_1_PERCENT * 50 ) / ZATTERA_100_PERCENT, VESTS_SYMBOL ) );
-         BOOST_REQUIRE( bob.balance == old_bob_balance );
+         BOOST_REQUIRE( bob.liquid_balance == old_bob_balance );
          BOOST_REQUIRE( sam.vesting_shares == old_sam_vesting );
-         BOOST_REQUIRE( sam.balance ==  old_sam_balance + asset( ( vesting_withdraw_rate.amount * ZATTERA_1_PERCENT * 30 ) / ZATTERA_100_PERCENT, VESTS_SYMBOL ) * db->get_dynamic_global_properties().get_vesting_share_price() );
+         BOOST_REQUIRE( sam.liquid_balance ==  old_sam_balance + asset( ( vesting_withdraw_rate.amount * ZATTERA_1_PERCENT * 30 ) / ZATTERA_100_PERCENT, VESTS_SYMBOL ) * db->get_dynamic_global_properties().get_vesting_share_price() );
 
-         old_alice_balance = alice.balance;
+         old_alice_balance = alice.liquid_balance;
          old_alice_vesting = alice.vesting_shares;
-         old_bob_balance = bob.balance;
+         old_bob_balance = bob.liquid_balance;
          old_bob_vesting = bob.vesting_shares;
-         old_sam_balance = sam.balance;
+         old_sam_balance = sam.liquid_balance;
          old_sam_vesting = sam.vesting_shares;
       }
 
@@ -588,11 +588,11 @@ BOOST_AUTO_TEST_CASE( set_vesting_withdraw_route )
          const auto& sam = db->get_account( "sam" );
 
          BOOST_REQUIRE( alice.vesting_shares == old_alice_vesting - vesting_withdraw_rate );
-         BOOST_REQUIRE( alice.balance == old_alice_balance );
+         BOOST_REQUIRE( alice.liquid_balance == old_alice_balance );
          BOOST_REQUIRE( bob.vesting_shares == old_bob_vesting + asset( ( vesting_withdraw_rate.amount * ZATTERA_1_PERCENT * 50 ) / ZATTERA_100_PERCENT, VESTS_SYMBOL ) );
-         BOOST_REQUIRE( bob.balance == old_bob_balance );
+         BOOST_REQUIRE( bob.liquid_balance == old_bob_balance );
          BOOST_REQUIRE( sam.vesting_shares == old_sam_vesting );
-         BOOST_REQUIRE( sam.balance ==  old_sam_balance + asset( ( vesting_withdraw_rate.amount * ZATTERA_1_PERCENT * 50 ) / ZATTERA_100_PERCENT, VESTS_SYMBOL ) * db->get_dynamic_global_properties().get_vesting_share_price() );
+         BOOST_REQUIRE( sam.liquid_balance ==  old_sam_balance + asset( ( vesting_withdraw_rate.amount * ZATTERA_1_PERCENT * 50 ) / ZATTERA_100_PERCENT, VESTS_SYMBOL ) * db->get_dynamic_global_properties().get_vesting_share_price() );
       }
    }
    FC_LOG_AND_RETHROW()

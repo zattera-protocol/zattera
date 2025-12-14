@@ -238,13 +238,13 @@ namespace zattera { namespace protocol {
          FC_ASSERT( maximum_block_size >= ZATTERA_MIN_BLOCK_SIZE_LIMIT, "maximum_block_size smaller than minimum max block size" );
       }
 
-      itr = props.find( "zbd_interest_rate" );
+      itr = props.find( "dollar_interest_rate" );
       if( itr != props.end() )
       {
-         uint16_t zbd_interest_rate;
-         fc::raw::unpack_from_vector( itr->second, zbd_interest_rate );
-         FC_ASSERT( zbd_interest_rate >= 0, "zbd_interest_rate must be positive" );
-         FC_ASSERT( zbd_interest_rate <= ZATTERA_100_PERCENT, "zbd_interest_rate must not exceed 100%" );
+         uint16_t dollar_interest_rate;
+         fc::raw::unpack_from_vector( itr->second, dollar_interest_rate );
+         FC_ASSERT( dollar_interest_rate >= 0, "dollar_interest_rate must be positive" );
+         FC_ASSERT( dollar_interest_rate <= ZATTERA_100_PERCENT, "dollar_interest_rate must not exceed 100%" );
       }
 
       itr = props.find( "new_signing_key" );
@@ -255,14 +255,14 @@ namespace zattera { namespace protocol {
          FC_UNUSED( signing_key ); // This tests the deserialization of the key
       }
 
-      itr = props.find( "zbd_exchange_rate" );
+      itr = props.find( "dollar_exchange_rate" );
       if( itr != props.end() )
       {
-         price zbd_exchange_rate;
-         fc::raw::unpack_from_vector( itr->second, zbd_exchange_rate );
-         FC_ASSERT( ( is_asset_type( zbd_exchange_rate.base, ZBD_SYMBOL ) && is_asset_type( zbd_exchange_rate.quote, ZTR_SYMBOL ) ),
+         price dollar_exchange_rate;
+         fc::raw::unpack_from_vector( itr->second, dollar_exchange_rate );
+         FC_ASSERT( ( is_asset_type( dollar_exchange_rate.base, ZBD_SYMBOL ) && is_asset_type( dollar_exchange_rate.quote, ZTR_SYMBOL ) ),
             "Price feed must be a ZTR/ZBD price" );
-         zbd_exchange_rate.validate();
+         dollar_exchange_rate.validate();
       }
 
       itr = props.find( "url" );
@@ -381,13 +381,13 @@ namespace zattera { namespace protocol {
       validate_account_name( to );
       validate_account_name( agent );
       FC_ASSERT( fee.amount >= 0, "fee cannot be negative" );
-      FC_ASSERT( zbd_amount.amount >= 0, "zbd amount cannot be negative" );
-      FC_ASSERT( ztr_amount.amount >= 0, "ztr amount cannot be negative" );
-      FC_ASSERT( zbd_amount.amount > 0 || ztr_amount.amount > 0, "escrow must transfer a non-zero amount" );
+      FC_ASSERT( dollar_amount.amount >= 0, "dollar amount cannot be negative" );
+      FC_ASSERT( liquid_amount.amount >= 0, "liquid amount cannot be negative" );
+      FC_ASSERT( dollar_amount.amount > 0 || liquid_amount.amount > 0, "escrow must transfer a non-zero amount" );
       FC_ASSERT( from != agent && to != agent, "agent must be a third party" );
       FC_ASSERT( (fee.symbol == ZTR_SYMBOL) || (fee.symbol == ZBD_SYMBOL), "fee must be ZTR or ZBD" );
-      FC_ASSERT( zbd_amount.symbol == ZBD_SYMBOL, "zbd amount must contain ZBD" );
-      FC_ASSERT( ztr_amount.symbol == ZTR_SYMBOL, "ztr amount must contain ZTR" );
+      FC_ASSERT( dollar_amount.symbol == ZBD_SYMBOL, "dollar amount must contain ZBD" );
+      FC_ASSERT( liquid_amount.symbol == ZTR_SYMBOL, "liquid amount must contain ZTR" );
       FC_ASSERT( ratification_deadline < escrow_expiration, "ratification deadline must be before escrow expiration" );
       if ( json_meta.size() > 0 )
       {
@@ -423,11 +423,11 @@ namespace zattera { namespace protocol {
       validate_account_name( receiver );
       FC_ASSERT( who == from || who == to || who == agent, "who must be from or to or agent" );
       FC_ASSERT( receiver == from || receiver == to, "receiver must be from or to" );
-      FC_ASSERT( zbd_amount.amount >= 0, "zbd amount cannot be negative" );
-      FC_ASSERT( ztr_amount.amount >= 0, "ztr amount cannot be negative" );
-      FC_ASSERT( zbd_amount.amount > 0 || ztr_amount.amount > 0, "escrow must release a non-zero amount" );
-      FC_ASSERT( zbd_amount.symbol == ZBD_SYMBOL, "zbd amount must contain ZBD" );
-      FC_ASSERT( ztr_amount.symbol == ZTR_SYMBOL, "ztr amount must contain ZTR" );
+      FC_ASSERT( dollar_amount.amount >= 0, "dollar amount cannot be negative" );
+      FC_ASSERT( liquid_amount.amount >= 0, "liquid amount cannot be negative" );
+      FC_ASSERT( dollar_amount.amount > 0 || liquid_amount.amount > 0, "escrow must release a non-zero amount" );
+      FC_ASSERT( dollar_amount.symbol == ZBD_SYMBOL, "dollar amount must contain ZBD" );
+      FC_ASSERT( liquid_amount.symbol == ZTR_SYMBOL, "liquid amount must contain ZTR" );
    }
 
    void request_account_recovery_operation::validate()const
@@ -500,13 +500,13 @@ namespace zattera { namespace protocol {
    void claim_reward_balance_operation::validate()const
    {
       validate_account_name( account );
-      FC_ASSERT( is_asset_type( reward_ztr, ZTR_SYMBOL ), "Reward Zattera must be ZTR" );
-      FC_ASSERT( is_asset_type( reward_zbd, ZBD_SYMBOL ), "Reward Zattera must be ZBD" );
+      FC_ASSERT( is_asset_type( reward_liquids, ZTR_SYMBOL ), "Reward Zattera must be ZTR" );
+      FC_ASSERT( is_asset_type( reward_dollars, ZBD_SYMBOL ), "Reward Zattera must be ZBD" );
       FC_ASSERT( is_asset_type( reward_vests, VESTS_SYMBOL ), "Reward Zattera must be VESTS" );
-      FC_ASSERT( reward_ztr.amount >= 0, "Cannot claim a negative amount" );
-      FC_ASSERT( reward_zbd.amount >= 0, "Cannot claim a negative amount" );
+      FC_ASSERT( reward_liquids.amount >= 0, "Cannot claim a negative amount" );
+      FC_ASSERT( reward_dollars.amount >= 0, "Cannot claim a negative amount" );
       FC_ASSERT( reward_vests.amount >= 0, "Cannot claim a negative amount" );
-      FC_ASSERT( reward_ztr.amount > 0 || reward_zbd.amount > 0 || reward_vests.amount > 0, "Must claim something." );
+      FC_ASSERT( reward_liquids.amount > 0 || reward_dollars.amount > 0 || reward_vests.amount > 0, "Must claim something." );
    }
 
    void delegate_vesting_shares_operation::validate()const

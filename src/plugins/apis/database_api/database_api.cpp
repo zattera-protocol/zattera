@@ -46,8 +46,8 @@ class database_api_impl
          (find_vesting_delegations)
          (list_vesting_delegation_expirations)
          (find_vesting_delegation_expirations)
-         (list_zbd_conversion_requests)
-         (find_zbd_conversion_requests)
+         (list_dollar_conversion_requests)
+         (find_dollar_conversion_requests)
          (list_decline_voting_rights_requests)
          (find_decline_voting_rights_requests)
          (list_comments)
@@ -789,11 +789,11 @@ DEFINE_API_IMPL( database_api_impl, find_vesting_delegation_expirations )
 
 /* ZBD Conversion Requests */
 
-DEFINE_API_IMPL( database_api_impl, list_zbd_conversion_requests )
+DEFINE_API_IMPL( database_api_impl, list_dollar_conversion_requests )
 {
    FC_ASSERT( args.limit <= DATABASE_API_SINGLE_QUERY_LIMIT );
 
-   list_zbd_conversion_requests_return result;
+   list_dollar_conversion_requests_return result;
    result.requests.reserve( args.limit );
 
    switch( args.order )
@@ -825,9 +825,9 @@ DEFINE_API_IMPL( database_api_impl, list_zbd_conversion_requests )
    return result;
 }
 
-DEFINE_API_IMPL( database_api_impl, find_zbd_conversion_requests )
+DEFINE_API_IMPL( database_api_impl, find_dollar_conversion_requests )
 {
-   find_zbd_conversion_requests_return result;
+   find_dollar_conversion_requests_return result;
    const auto& convert_idx = _db.get_index< chain::convert_request_index, chain::by_owner >();
    auto itr = convert_idx.lower_bound( args.account );
 
@@ -1278,8 +1278,8 @@ DEFINE_API_IMPL( database_api_impl, get_order_book )
       cur.order_price = itr->sell_price;
       cur.real_price  = 0.0;
       // cur.real_price  = (cur.order_price).to_real();
-      cur.zbd = itr->for_sale;
-      cur.ztr = ( asset( itr->for_sale, ZBD_SYMBOL ) * cur.order_price ).amount;
+      cur.dollars = itr->for_sale;
+      cur.liquid = ( asset( itr->for_sale, ZBD_SYMBOL ) * cur.order_price ).amount;
       cur.created = itr->created;
       result.bids.push_back( cur );
       ++sell_itr;
@@ -1291,8 +1291,8 @@ DEFINE_API_IMPL( database_api_impl, get_order_book )
       cur.order_price = itr->sell_price;
       cur.real_price = 0.0;
       // cur.real_price  = (~cur.order_price).to_real();
-      cur.ztr     = itr->for_sale;
-      cur.zbd     = ( asset( itr->for_sale, ZTR_SYMBOL ) * cur.order_price ).amount;
+      cur.liquid  = itr->for_sale;
+      cur.dollars = ( asset( itr->for_sale, ZTR_SYMBOL ) * cur.order_price ).amount;
       cur.created = itr->created;
       result.asks.push_back( cur );
       ++buy_itr;
@@ -1448,8 +1448,8 @@ DEFINE_READ_APIS( database_api,
    (find_vesting_delegations)
    (list_vesting_delegation_expirations)
    (find_vesting_delegation_expirations)
-   (list_zbd_conversion_requests)
-   (find_zbd_conversion_requests)
+   (list_dollar_conversion_requests)
+   (find_dollar_conversion_requests)
    (list_decline_voting_rights_requests)
    (find_decline_voting_rights_requests)
    (list_comments)

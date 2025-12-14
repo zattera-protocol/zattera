@@ -26,24 +26,24 @@ struct get_ticker_return
    double      lowest_ask = 0;
    double      highest_bid = 0;
    double      percent_change = 0;
-   asset       ztr_volume = asset( 0 , ZTR_SYMBOL );
-   asset       zbd_volume = asset( 0, ZBD_SYMBOL );
+   asset       liquid_volume = asset( 0 , ZTR_SYMBOL );
+   asset       dollar_volume = asset( 0, ZBD_SYMBOL );
 };
 
 typedef void_type get_volume_args;
 
 struct get_volume_return
 {
-   asset       ztr_volume = asset( 0, ZTR_SYMBOL );
-   asset       zbd_volume = asset( 0, ZBD_SYMBOL );
+   asset       liquid_volume = asset( 0, ZTR_SYMBOL );
+   asset       dollar_volume = asset( 0, ZBD_SYMBOL );
 };
 
 struct order
 {
    price          order_price;
    double         real_price;
-   share_type     ztr;
-   share_type     zbd;
+   share_type     liquid;
+   share_type     dollars;
    time_point_sec created;
 };
 
@@ -130,13 +130,13 @@ class market_history_api
 } } } // zattera::plugins::market_history
 
 FC_REFLECT( zattera::plugins::market_history::get_ticker_return,
-            (latest)(lowest_ask)(highest_bid)(percent_change)(ztr_volume)(zbd_volume) )
+            (latest)(lowest_ask)(highest_bid)(percent_change)(liquid_volume)(dollar_volume) )
 
 FC_REFLECT( zattera::plugins::market_history::get_volume_return,
-            (ztr_volume)(zbd_volume) )
+            (liquid_volume)(dollar_volume) )
 
 FC_REFLECT( zattera::plugins::market_history::order,
-            (order_price)(real_price)(ztr)(zbd)(created) )
+            (order_price)(real_price)(liquid)(dollars)(created) )
 
 FC_REFLECT( zattera::plugins::market_history::get_order_book_args,
             (limit) )

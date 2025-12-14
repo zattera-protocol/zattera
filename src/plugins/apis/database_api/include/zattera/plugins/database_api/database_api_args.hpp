@@ -348,25 +348,25 @@ typedef list_vesting_delegation_expirations_return find_vesting_delegation_expir
 
 /* ZBD Converstions */
 
-struct list_zbd_conversion_requests_args
+struct list_dollar_conversion_requests_args
 {
    fc::variant       start;
    uint32_t          limit;
    sort_order_type   order;
 };
 
-struct list_zbd_conversion_requests_return
+struct list_dollar_conversion_requests_return
 {
    vector< api_convert_request_object > requests;
 };
 
 
-struct find_zbd_conversion_requests_args
+struct find_dollar_conversion_requests_args
 {
    account_name_type account;
 };
 
-typedef list_zbd_conversion_requests_return find_zbd_conversion_requests_return;
+typedef list_dollar_conversion_requests_return find_dollar_conversion_requests_return;
 
 
 /* Decline Voting Rights Requests */
@@ -691,13 +691,13 @@ FC_REFLECT( zattera::plugins::database_api::list_vesting_delegation_expirations_
 FC_REFLECT( zattera::plugins::database_api::find_vesting_delegation_expirations_args,
    (account) )
 
-FC_REFLECT( zattera::plugins::database_api::list_zbd_conversion_requests_args,
+FC_REFLECT( zattera::plugins::database_api::list_dollar_conversion_requests_args,
    (start)(limit)(order) )
 
-FC_REFLECT( zattera::plugins::database_api::list_zbd_conversion_requests_return,
+FC_REFLECT( zattera::plugins::database_api::list_dollar_conversion_requests_return,
    (requests) )
 
-FC_REFLECT( zattera::plugins::database_api::find_zbd_conversion_requests_args,
+FC_REFLECT( zattera::plugins::database_api::find_dollar_conversion_requests_args,
    (account) )
 
 FC_REFLECT( zattera::plugins::database_api::list_decline_voting_rights_requests_args,

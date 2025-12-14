@@ -20,7 +20,7 @@ namespace zattera { namespace chain {
    typedef protocol::fixed_string< 16 > reward_fund_name_type;
 
    /**
-    *  This object is used to track pending requests to convert zbd to ztr
+    *  This object is used to track pending requests to convert dollars to liquid
     */
    class convert_request_object : public object< convert_request_object_type, convert_request_object >
    {
@@ -61,8 +61,8 @@ namespace zattera { namespace chain {
          account_name_type agent;
          time_point_sec    ratification_deadline;
          time_point_sec    escrow_expiration;
-         asset             zbd_balance;
-         asset             ztr_balance;
+         asset             dollar_balance;
+         asset             liquid_balance;
          asset             pending_fee;
          bool              to_approved = false;
          bool              agent_approved = false;
@@ -412,7 +412,7 @@ CHAINBASE_SET_INDEX_TYPE( zattera::chain::savings_withdraw_object, zattera::chai
 FC_REFLECT( zattera::chain::escrow_object,
              (id)(escrow_id)(from)(to)(agent)
              (ratification_deadline)(escrow_expiration)
-             (zbd_balance)(ztr_balance)(pending_fee)
+             (dollar_balance)(liquid_balance)(pending_fee)
              (to_approved)(agent_approved)(disputed) )
 CHAINBASE_SET_INDEX_TYPE( zattera::chain::escrow_object, zattera::chain::escrow_index )
 
