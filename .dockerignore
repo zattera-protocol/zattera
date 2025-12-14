@@ -35,9 +35,10 @@ __pycache__/
 # Pyenv
 .python-version
 
+# Node data
+witness_node_data_dir/
+
 # AI agents
 AGENTS.md
 CLAUDE.md
 .claude
-
-witness_node_data_dir
