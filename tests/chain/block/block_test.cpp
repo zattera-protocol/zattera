@@ -52,7 +52,7 @@ void open_test_database( database& db, const fc::path& dir )
    args.data_dir = dir;
    args.shared_mem_dir = dir;
    args.initial_supply = TEST_INITIAL_SUPPLY;
-   args.zbd_initial_supply = TEST_ZBD_INITIAL_SUPPLY;
+   args.dollar_initial_supply = TEST_ZBD_INITIAL_SUPPLY;
    args.shared_file_size = TEST_SHARED_MEM_SIZE;
    db.open( args );
 }

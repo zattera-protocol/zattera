@@ -138,7 +138,7 @@ BOOST_AUTO_TEST_CASE( apply_witness_update )
       BOOST_REQUIRE( alice_witness.virtual_last_update == 0 );
       BOOST_REQUIRE( alice_witness.virtual_position == 0 );
       BOOST_REQUIRE( alice_witness.virtual_scheduled_time == fc::uint128_t::max_value() );
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "10.000 TTR" ).amount.value ); // No fee
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "10.000 TTR" ).amount.value ); // No fee
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test updating a witness" );
@@ -164,7 +164,7 @@ BOOST_AUTO_TEST_CASE( apply_witness_update )
       BOOST_REQUIRE( alice_witness.virtual_last_update == 0 );
       BOOST_REQUIRE( alice_witness.virtual_position == 0 );
       BOOST_REQUIRE( alice_witness.virtual_scheduled_time == fc::uint128_t::max_value() );
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "10.000 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "10.000 TTR" ).amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test failure when upgrading a non-existent account" );
@@ -260,8 +260,8 @@ BOOST_AUTO_TEST_CASE( apply_feed_publish )
 
       witness_object& alice_witness = const_cast< witness_object& >( db->get_witness( "alice" ) );
 
-      BOOST_REQUIRE( alice_witness.zbd_exchange_rate == op.exchange_rate );
-      BOOST_REQUIRE( alice_witness.last_zbd_exchange_update == db->head_block_time() );
+      BOOST_REQUIRE( alice_witness.dollar_exchange_rate == op.exchange_rate );
+      BOOST_REQUIRE( alice_witness.last_dollar_exchange_update == db->head_block_time() );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test failure publishing to non-existent witness" );
@@ -296,8 +296,8 @@ BOOST_AUTO_TEST_CASE( apply_feed_publish )
       db->push_transaction( tx, 0 );
 
       alice_witness = const_cast< witness_object& >( db->get_witness( "alice" ) );
-      // BOOST_REQUIRE( std::abs( alice_witness.zbd_exchange_rate.to_real() - op.exchange_rate.to_real() ) < 0.0000005 );
-      BOOST_REQUIRE( alice_witness.last_zbd_exchange_update == db->head_block_time() );
+      // BOOST_REQUIRE( std::abs( alice_witness.dollar_exchange_rate.to_real() - op.exchange_rate.to_real() ) < 0.0000005 );
+      BOOST_REQUIRE( alice_witness.last_dollar_exchange_update == db->head_block_time() );
       validate_database();
    }
    FC_LOG_AND_RETHROW()
@@ -343,23 +343,23 @@ BOOST_AUTO_TEST_CASE( validate_witness_set_properties )
       prop_op.props[ "maximum_block_size" ] = fc::raw::pack_to_vector( ZATTERA_MIN_BLOCK_SIZE_LIMIT - 1 );
       ZATTERA_REQUIRE_THROW( prop_op.validate(), fc::assert_exception );
 
-      BOOST_TEST_MESSAGE( "--- failure when setting zbd_interest_rate with negative number" );
+      BOOST_TEST_MESSAGE( "--- failure when setting dollar_interest_rate with negative number" );
       prop_op.props.erase( "maximum_block_size" );
-      prop_op.props[ "zbd_interest_rate" ] = fc::raw::pack_to_vector( -700 );
+      prop_op.props[ "dollar_interest_rate" ] = fc::raw::pack_to_vector( -700 );
       ZATTERA_REQUIRE_THROW( prop_op.validate(), fc::assert_exception );
 
-      BOOST_TEST_MESSAGE( "--- failure when setting zbd_interest_rate to ZATTERA_100_PERCENT + 1" );
-      prop_op.props[ "zbd_interest_rate" ].clear();
-      prop_op.props[ "zbd_interest_rate" ] = fc::raw::pack_to_vector( ZATTERA_100_PERCENT + 1 );
+      BOOST_TEST_MESSAGE( "--- failure when setting dollar_interest_rate to ZATTERA_100_PERCENT + 1" );
+      prop_op.props[ "dollar_interest_rate" ].clear();
+      prop_op.props[ "dollar_interest_rate" ] = fc::raw::pack_to_vector( ZATTERA_100_PERCENT + 1 );
       ZATTERA_REQUIRE_THROW( prop_op.validate(), fc::assert_exception );
 
-      BOOST_TEST_MESSAGE( "--- failure when setting new zbd_exchange_rate with ZBD / ZTR" );
-      prop_op.props.erase( "zbd_interest_rate" );
-      prop_op.props[ "zbd_exchange_rate" ] = fc::raw::pack_to_vector( price( ASSET( "1.000 TTR" ), ASSET( "10.000 TBD" ) ) );
+      BOOST_TEST_MESSAGE( "--- failure when setting new dollar_exchange_rate with ZBD / ZTR" );
+      prop_op.props.erase( "dollar_interest_rate" );
+      prop_op.props[ "dollar_exchange_rate" ] = fc::raw::pack_to_vector( price( ASSET( "1.000 TTR" ), ASSET( "10.000 TBD" ) ) );
       ZATTERA_REQUIRE_THROW( prop_op.validate(), fc::assert_exception );
 
       BOOST_TEST_MESSAGE( "--- failure when setting new url with length of zero" );
-      prop_op.props.erase( "zbd_exchange_rate" );
+      prop_op.props.erase( "dollar_exchange_rate" );
       prop_op.props[ "url" ] = fc::raw::pack_to_vector( "" );
       ZATTERA_REQUIRE_THROW( prop_op.validate(), fc::assert_exception );
 
@@ -468,20 +468,20 @@ BOOST_AUTO_TEST_CASE( apply_witness_set_properties )
       db->push_transaction( tx, 0 );
       BOOST_REQUIRE( alice_witness.props.maximum_block_size == ZATTERA_MIN_BLOCK_SIZE_LIMIT + 1 );
 
-      // Setting zbd_interest_rate
+      // Setting dollar_interest_rate
       prop_op.props.erase( "maximim_block_size" );
-      prop_op.props[ "zbd_interest_rate" ] = fc::raw::pack_to_vector( 700 );
+      prop_op.props[ "dollar_interest_rate" ] = fc::raw::pack_to_vector( 700 );
       tx.clear();
       tx.operations.push_back( prop_op );
       tx.sign( signing_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
-      BOOST_REQUIRE( alice_witness.props.zbd_interest_rate == 700 );
+      BOOST_REQUIRE( alice_witness.props.dollar_interest_rate == 700 );
 
       // Setting new signing_key
       private_key_type old_signing_key = signing_key;
       signing_key = generate_private_key( "new_key" );
       public_key_type alice_pub = signing_key.get_public_key();
-      prop_op.props.erase( "zbd_interest_rate" );
+      prop_op.props.erase( "dollar_interest_rate" );
       prop_op.props[ "new_signing_key" ] = fc::raw::pack_to_vector( alice_pub );
       tx.clear();
       tx.operations.push_back( prop_op );
@@ -489,20 +489,20 @@ BOOST_AUTO_TEST_CASE( apply_witness_set_properties )
       db->push_transaction( tx, 0 );
       BOOST_REQUIRE( alice_witness.signing_key == alice_pub );
 
-      // Setting new zbd_exchange_rate
+      // Setting new dollar_exchange_rate
       prop_op.props.erase( "new_signing_key" );
       prop_op.props[ "key" ].clear();
       prop_op.props[ "key" ] = fc::raw::pack_to_vector( signing_key.get_public_key() );
-      prop_op.props[ "zbd_exchange_rate" ] = fc::raw::pack_to_vector( price( ASSET(" 1.000 TBD" ), ASSET( "100.000 TTR" ) ) );
+      prop_op.props[ "dollar_exchange_rate" ] = fc::raw::pack_to_vector( price( ASSET(" 1.000 TBD" ), ASSET( "100.000 TTR" ) ) );
       tx.clear();
       tx.operations.push_back( prop_op );
       tx.sign( signing_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
-      BOOST_REQUIRE( alice_witness.zbd_exchange_rate == price( ASSET( "1.000 TBD" ), ASSET( "100.000 TTR" ) ) );
-      BOOST_REQUIRE( alice_witness.last_zbd_exchange_update == db->head_block_time() );
+      BOOST_REQUIRE( alice_witness.dollar_exchange_rate == price( ASSET( "1.000 TBD" ), ASSET( "100.000 TTR" ) ) );
+      BOOST_REQUIRE( alice_witness.last_dollar_exchange_update == db->head_block_time() );
 
       // Setting new url
-      prop_op.props.erase( "zbd_exchange_rate" );
+      prop_op.props.erase( "dollar_exchange_rate" );
       prop_op.props[ "url" ] = fc::raw::pack_to_vector( "foo.bar" );
       tx.clear();
       tx.operations.push_back( prop_op );
@@ -511,7 +511,7 @@ BOOST_AUTO_TEST_CASE( apply_witness_set_properties )
       BOOST_REQUIRE( alice_witness.url == "foo.bar" );
 
       // Setting new extranious_property
-      prop_op.props.erase( "zbd_exchange_rate" );
+      prop_op.props.erase( "dollar_exchange_rate" );
       prop_op.props[ "extraneous_property" ] = fc::raw::pack_to_vector( "foo" );
       tx.clear();
       tx.operations.push_back( prop_op );

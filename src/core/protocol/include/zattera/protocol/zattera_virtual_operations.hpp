@@ -10,12 +10,12 @@ namespace zattera { namespace protocol {
    struct author_reward_operation : public virtual_operation {
       author_reward_operation(){}
       author_reward_operation( const account_name_type& a, const string& p, const asset& zb, const asset& zt, const asset& v )
-         :author(a), permlink(p), zbd_payout(zb), ztr_payout(zt), vesting_payout(v){}
+         :author(a), permlink(p), dollar_payout(zb), liquid_payout(zt), vesting_payout(v){}
 
       account_name_type author;
       string            permlink;
-      asset             zbd_payout;
-      asset             ztr_payout;
+      asset             dollar_payout;
+      asset             liquid_payout;
       asset             vesting_payout;
    };
 
@@ -178,7 +178,7 @@ namespace zattera { namespace protocol {
 
 } } //zattera::protocol
 
-FC_REFLECT( zattera::protocol::author_reward_operation, (author)(permlink)(zbd_payout)(ztr_payout)(vesting_payout) )
+FC_REFLECT( zattera::protocol::author_reward_operation, (author)(permlink)(dollar_payout)(liquid_payout)(vesting_payout) )
 FC_REFLECT( zattera::protocol::curation_reward_operation, (curator)(reward)(comment_author)(comment_permlink) )
 FC_REFLECT( zattera::protocol::comment_reward_operation, (author)(permlink)(payout) )
 FC_REFLECT( zattera::protocol::fill_convert_request_operation, (owner)(requestid)(amount_in)(amount_out) )

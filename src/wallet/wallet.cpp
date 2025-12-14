@@ -289,7 +289,7 @@ public:
       result["head_block_id"           ] = dynamic_props.head_block_id;
       result["head_block_age"          ] = fc::get_approximate_relative_time_string(dynamic_props.time, time_point_sec(time_point::now()), " old");
       result["participation"           ] = (100 * dynamic_props.recent_slots_filled.popcount()) / 128.0;
-      result["median_zbd_price"        ] = _remote_api.get_current_median_history_price();
+      result["median_dollar_price"        ] = _remote_api.get_current_median_history_price();
       result["account_creation_fee"    ] = _remote_api.get_chain_properties().account_creation_fee;
       result["reward_funds"            ] = _remote_api.get_reward_funds();
 
@@ -714,23 +714,23 @@ public:
          std::stringstream out;
 
          auto accounts = result.as<vector<database_api::api_account_object>>();
-         asset total_ztr;
+         asset total_liquid;
          asset total_vest(0, VESTS_SYMBOL );
-         asset total_zbd(0, ZBD_SYMBOL );
+         asset total_dollar(0, ZBD_SYMBOL );
          for( const auto& a : accounts ) {
-            total_ztr += a.balance;
+            total_liquid += a.liquid_balance;
             total_vest  += a.vesting_shares;
-            total_zbd  += a.zbd_balance;
+            total_dollar  += a.dollar_balance;
             out << std::left << std::setw( 17 ) << std::string(a.name)
-                << std::right << std::setw(18) << fc::variant(a.balance).as_string() <<" "
+                << std::right << std::setw(18) << fc::variant(a.liquid_balance).as_string() <<" "
                 << std::right << std::setw(26) << fc::variant(a.vesting_shares).as_string() <<" "
-                << std::right << std::setw(16) << fc::variant(a.zbd_balance).as_string() <<"\n";
+                << std::right << std::setw(16) << fc::variant(a.dollar_balance).as_string() <<"\n";
          }
          out << "-------------------------------------------------------------------------\n";
             out << std::left << std::setw( 17 ) << "TOTAL"
-                << std::right << std::setw(18) << fc::variant(total_ztr).as_string() <<" "
+                << std::right << std::setw(18) << fc::variant(total_liquid).as_string() <<" "
                 << std::right << std::setw(26) << fc::variant(total_vest).as_string() <<" "
-                << std::right << std::setw(16) << fc::variant(total_zbd).as_string() <<"\n";
+                << std::right << std::setw(16) << fc::variant(total_dollar).as_string() <<"\n";
          return out.str();
       };
       m["get_account_history"] = []( fc::variant result, const fc::variants& a ) {
@@ -798,11 +798,11 @@ public:
          {
             if ( i < orders.bids.size() )
             {
-               bid_sum += asset( orders.bids[i].zbd, ZBD_SYMBOL );
+               bid_sum += asset( orders.bids[i].dollars, ZBD_SYMBOL );
                ss
                   << ' ' << setw( spacing ) << fc::json::to_string( bid_sum )
-                  << ' ' << setw( spacing ) << fc::json::to_string( asset( orders.bids[i].zbd, ZBD_SYMBOL ) )
-                  << ' ' << setw( spacing ) << fc::json::to_string( asset( orders.bids[i].ztr, ZTR_SYMBOL ) )
+                  << ' ' << setw( spacing ) << fc::json::to_string( asset( orders.bids[i].dollars, ZBD_SYMBOL ) )
+                  << ' ' << setw( spacing ) << fc::json::to_string( asset( orders.bids[i].liquid, ZTR_SYMBOL ) )
                   << ' ' << setw( spacing ) << orders.bids[i].real_price;
             }
             else
@@ -814,10 +814,10 @@ public:
 
             if ( i < orders.asks.size() )
             {
-               ask_sum += asset( orders.asks[i].zbd, ZBD_SYMBOL );
+               ask_sum += asset( orders.asks[i].dollars, ZBD_SYMBOL );
                ss << ' ' << setw( spacing ) << orders.asks[i].real_price
-                  << ' ' << setw( spacing ) << fc::json::to_string( asset( orders.asks[i].ztr, ZTR_SYMBOL ) )
-                  << ' ' << setw( spacing ) << fc::json::to_string( asset( orders.asks[i].zbd, ZBD_SYMBOL ) )
+                  << ' ' << setw( spacing ) << fc::json::to_string( asset( orders.asks[i].liquid, ZTR_SYMBOL ) )
+                  << ' ' << setw( spacing ) << fc::json::to_string( asset( orders.asks[i].dollars, ZBD_SYMBOL ) )
                   << ' ' << setw( spacing ) << fc::json::to_string( ask_sum );
             }
 
@@ -1209,7 +1209,7 @@ signed_transaction wallet_api::create_account_with_keys(
  */
 signed_transaction wallet_api::create_account_with_keys_delegated(
    string creator,
-   asset ztr_fee,
+   asset liquid_fee,
    asset delegated_vests,
    string new_account_name,
    string json_meta,
@@ -1228,7 +1228,7 @@ signed_transaction wallet_api::create_account_with_keys_delegated(
    op.posting = authority( 1, posting, 1 );
    op.memo_key = memo;
    op.json_metadata = json_meta;
-   op.fee = ztr_fee;
+   op.fee = liquid_fee;
    op.delegation = delegated_vests;
 
    signed_transaction tx;
@@ -1625,7 +1625,7 @@ signed_transaction wallet_api::create_account(
  */
 signed_transaction wallet_api::create_account_delegated(
    string creator,
-   asset ztr_fee,
+   asset liquid_fee,
    asset delegated_vests,
    string new_account_name,
    string json_meta,
@@ -1640,7 +1640,7 @@ signed_transaction wallet_api::create_account_delegated(
    import_key( active.wif_priv_key );
    import_key( posting.wif_priv_key );
    import_key( memo.wif_priv_key );
-   return create_account_with_keys_delegated( creator, ztr_fee, delegated_vests, new_account_name, json_meta,  owner.pub_key, active.pub_key, posting.pub_key, memo.pub_key, broadcast );
+   return create_account_with_keys_delegated( creator, liquid_fee, delegated_vests, new_account_name, json_meta,  owner.pub_key, active.pub_key, posting.pub_key, memo.pub_key, broadcast );
 } FC_CAPTURE_AND_RETHROW( (creator)(new_account_name)(json_meta) ) }
 
 
@@ -1818,8 +1818,8 @@ signed_transaction wallet_api::escrow_transfer(
    string to,
    string agent,
    uint32_t escrow_id,
-   asset zbd_amount,
-   asset ztr_amount,
+   asset dollar_amount,
+   asset liquid_amount,
    asset fee,
    time_point_sec ratification_deadline,
    time_point_sec escrow_expiration,
@@ -1832,8 +1832,8 @@ signed_transaction wallet_api::escrow_transfer(
    op.to = to;
    op.agent = agent;
    op.escrow_id = escrow_id;
-   op.zbd_amount = zbd_amount;
-   op.ztr_amount = ztr_amount;
+   op.dollar_amount = dollar_amount;
+   op.liquid_amount = liquid_amount;
    op.fee = fee;
    op.ratification_deadline = ratification_deadline;
    op.escrow_expiration = escrow_expiration;
@@ -1900,8 +1900,8 @@ signed_transaction wallet_api::escrow_release(
    string who,
    string receiver,
    uint32_t escrow_id,
-   asset zbd_amount,
-   asset ztr_amount,
+   asset dollar_amount,
+   asset liquid_amount,
    bool broadcast )
 {
    FC_ASSERT( !is_locked() );
@@ -1912,8 +1912,8 @@ signed_transaction wallet_api::escrow_release(
    op.who = who;
    op.receiver = receiver;
    op.escrow_id = escrow_id;
-   op.zbd_amount = zbd_amount;
-   op.ztr_amount = ztr_amount;
+   op.dollar_amount = dollar_amount;
+   op.liquid_amount = liquid_amount;
 
    signed_transaction tx;
    tx.operations.push_back( op );
@@ -2050,7 +2050,7 @@ signed_transaction wallet_api::set_withdraw_vesting_route(
    return my->sign_transaction( tx, broadcast );
 }
 
-signed_transaction wallet_api::convert_zbd(
+signed_transaction wallet_api::convert_dollar(
    string from,
    asset amount,
    bool broadcast )
@@ -2151,16 +2151,16 @@ signed_transaction wallet_api::decline_voting_rights(
 
 signed_transaction wallet_api::claim_reward_balance(
    string account,
-   asset reward_ztr,
-   asset reward_zbd,
+   asset reward_liquids,
+   asset reward_dollars,
    asset reward_vests,
    bool broadcast )
 {
    FC_ASSERT( !is_locked() );
    claim_reward_balance_operation op;
    op.account = account;
-   op.reward_ztr = reward_ztr;
-   op.reward_zbd = reward_zbd;
+   op.reward_liquids = reward_liquids;
+   op.reward_dollars = reward_dollars;
    op.reward_vests = reward_vests;
 
    signed_transaction tx;

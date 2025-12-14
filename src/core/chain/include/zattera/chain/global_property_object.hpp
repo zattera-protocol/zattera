@@ -38,38 +38,38 @@ namespace zattera { namespace chain {
          account_name_type current_witness;
 
 
-         asset       virtual_supply             = asset( 0, ZTR_SYMBOL );
-         asset       current_supply             = asset( 0, ZTR_SYMBOL );
-         asset       confidential_supply        = asset( 0, ZTR_SYMBOL ); ///< total asset held in confidential balances
-         asset       current_zbd_supply         = asset( 0, ZBD_SYMBOL );
-         asset       confidential_zbd_supply    = asset( 0, ZBD_SYMBOL ); ///< total asset held in confidential balances
-         asset       total_vesting_fund_ztr   = asset( 0, ZTR_SYMBOL );
+         asset       virtual_liquid_supply             = asset( 0, ZTR_SYMBOL );
+         asset       current_liquid_supply             = asset( 0, ZTR_SYMBOL );
+         asset       confidential_liquid_supply        = asset( 0, ZTR_SYMBOL ); ///< total asset held in confidential balances
+         asset       current_dollar_supply         = asset( 0, ZBD_SYMBOL );
+         asset       confidential_dollar_supply    = asset( 0, ZBD_SYMBOL ); ///< total asset held in confidential balances
+         asset       total_vesting_fund_liquid   = asset( 0, ZTR_SYMBOL );
          asset       total_vesting_shares       = asset( 0, VESTS_SYMBOL );
-         asset       total_reward_fund_ztr    = asset( 0, ZTR_SYMBOL );
+         asset       total_reward_fund_liquid    = asset( 0, ZTR_SYMBOL );
          fc::uint128 total_reward_shares2; ///< the running total of REWARD^2
          asset       pending_rewarded_vesting_shares = asset( 0, VESTS_SYMBOL );
-         asset       pending_rewarded_vesting_ztr = asset( 0, ZTR_SYMBOL );
+         asset       pending_rewarded_vesting_liquid = asset( 0, ZTR_SYMBOL );
 
          price       get_vesting_share_price() const
          {
-            if ( total_vesting_fund_ztr.amount == 0 || total_vesting_shares.amount == 0 )
+            if ( total_vesting_fund_liquid.amount == 0 || total_vesting_shares.amount == 0 )
                return price ( asset( 1000, ZTR_SYMBOL ), asset( 1000000, VESTS_SYMBOL ) );
 
-            return price( total_vesting_shares, total_vesting_fund_ztr );
+            return price( total_vesting_shares, total_vesting_fund_liquid );
          }
 
          price get_reward_vesting_share_price() const
          {
             return price( total_vesting_shares + pending_rewarded_vesting_shares,
-               total_vesting_fund_ztr + pending_rewarded_vesting_ztr );
+               total_vesting_fund_liquid + pending_rewarded_vesting_liquid );
          }
 
          /**
-          *  This property defines the interest rate that ZBD deposits receive.
+          *  This property defines the interest rate that dollar deposits receive.
           */
-         uint16_t zbd_interest_rate = 0;
+         uint16_t dollar_interest_rate = 0;
 
-         uint16_t zbd_print_rate = ZATTERA_100_PERCENT;
+         uint16_t dollar_print_rate = ZATTERA_100_PERCENT;
 
          /**
           *  Maximum block size is decided by the set of active witnesses which change every round.
@@ -123,19 +123,19 @@ FC_REFLECT( zattera::chain::dynamic_global_property_object,
              (head_block_id)
              (time)
              (current_witness)
-             (virtual_supply)
-             (current_supply)
-             (confidential_supply)
-             (current_zbd_supply)
-             (confidential_zbd_supply)
-             (total_vesting_fund_ztr)
+             (virtual_liquid_supply)
+             (current_liquid_supply)
+             (confidential_liquid_supply)
+             (current_dollar_supply)
+             (confidential_dollar_supply)
+             (total_vesting_fund_liquid)
              (total_vesting_shares)
-             (total_reward_fund_ztr)
+             (total_reward_fund_liquid)
              (total_reward_shares2)
              (pending_rewarded_vesting_shares)
-             (pending_rewarded_vesting_ztr)
-             (zbd_interest_rate)
-             (zbd_print_rate)
+             (pending_rewarded_vesting_liquid)
+             (dollar_interest_rate)
+             (dollar_print_rate)
              (maximum_block_size)
              (current_aslot)
              (recent_slots_filled)

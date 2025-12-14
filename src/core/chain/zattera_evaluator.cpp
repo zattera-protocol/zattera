@@ -77,7 +77,7 @@ void copy_legacy_chain_properties( chain_properties& dest, const legacy_chain_pr
 {
    dest.account_creation_fee = src.account_creation_fee.to_asset< force_canon >();
    dest.maximum_block_size = src.maximum_block_size;
-   dest.zbd_interest_rate = src.zbd_interest_rate;
+   dest.dollar_interest_rate = src.dollar_interest_rate;
 }
 
 void witness_update_evaluator::do_apply( const witness_update_operation& o )
@@ -127,16 +127,16 @@ void witness_set_properties_evaluator::do_apply( const witness_set_properties_op
    // Capture old properties. This allows only updating the object once.
    chain_properties  props;
    public_key_type   signing_key;
-   price             zbd_exchange_rate;
-   time_point_sec    last_zbd_exchange_update;
+   price             dollar_exchange_rate;
+   time_point_sec    last_dollar_exchange_update;
    string            url;
 
    bool account_creation_changed = false;
    bool max_block_changed        = false;
-   bool zbd_interest_changed     = false;
+   bool dollar_interest_changed     = false;
    bool account_subsidy_changed  = false;
    bool key_changed              = false;
-   bool zbd_exchange_changed     = false;
+   bool dollar_exchange_changed     = false;
    bool url_changed              = false;
 
    auto itr = o.props.find( "key" );
@@ -160,11 +160,11 @@ void witness_set_properties_evaluator::do_apply( const witness_set_properties_op
       max_block_changed = true;
    }
 
-   itr = o.props.find( "zbd_interest_rate" );
+   itr = o.props.find( "dollar_interest_rate" );
    if( itr != o.props.end() )
    {
-      fc::raw::unpack_from_vector( itr->second, props.zbd_interest_rate );
-      zbd_interest_changed = true;
+      fc::raw::unpack_from_vector( itr->second, props.dollar_interest_rate );
+      dollar_interest_changed = true;
    }
 
    itr = o.props.find( "account_subsidy_limit" );
@@ -181,12 +181,12 @@ void witness_set_properties_evaluator::do_apply( const witness_set_properties_op
       key_changed = true;
    }
 
-   itr = o.props.find( "zbd_exchange_rate" );
+   itr = o.props.find( "dollar_exchange_rate" );
    if( itr != o.props.end() )
    {
-      fc::raw::unpack_from_vector( itr->second, zbd_exchange_rate );
-      last_zbd_exchange_update = _db.head_block_time();
-      zbd_exchange_changed = true;
+      fc::raw::unpack_from_vector( itr->second, dollar_exchange_rate );
+      last_dollar_exchange_update = _db.head_block_time();
+      dollar_exchange_changed = true;
    }
 
    itr = o.props.find( "url" );
@@ -204,8 +204,8 @@ void witness_set_properties_evaluator::do_apply( const witness_set_properties_op
       if( max_block_changed )
          w.props.maximum_block_size = props.maximum_block_size;
 
-      if( zbd_interest_changed )
-         w.props.zbd_interest_rate = props.zbd_interest_rate;
+      if( dollar_interest_changed )
+         w.props.dollar_interest_rate = props.dollar_interest_rate;
 
       if( account_subsidy_changed )
          w.props.account_subsidy_limit = props.account_subsidy_limit;
@@ -213,10 +213,10 @@ void witness_set_properties_evaluator::do_apply( const witness_set_properties_op
       if( key_changed )
          w.signing_key = signing_key;
 
-      if( zbd_exchange_changed )
+      if( dollar_exchange_changed )
       {
-         w.zbd_exchange_rate = zbd_exchange_rate;
-         w.last_zbd_exchange_update = last_zbd_exchange_update;
+         w.dollar_exchange_rate = dollar_exchange_rate;
+         w.last_dollar_exchange_update = last_dollar_exchange_update;
       }
 
       if( url_changed )
@@ -259,7 +259,7 @@ void account_create_evaluator::do_apply( const account_create_operation& o )
 
    const auto& props = _db.get_dynamic_global_properties();
 
-   FC_ASSERT( creator.balance >= o.fee, "Insufficient balance to create account.", ( "creator.balance", creator.balance )( "required", o.fee ) );
+   FC_ASSERT( creator.liquid_balance >= o.fee, "Insufficient balance to create account.", ( "creator.liquid_balance", creator.liquid_balance )( "required", o.fee ) );
 
    const witness_schedule_object& wso = _db.get_witness_schedule_object();
    FC_ASSERT( o.fee >= wso.median_props.account_creation_fee, "Insufficient Fee: ${f} required, ${p} provided.",
@@ -279,7 +279,7 @@ void account_create_evaluator::do_apply( const account_create_operation& o )
    verify_authority_accounts_exist( _db, o.posting, o.new_account_name, authority::posting );
 
    _db.modify( creator, [&]( account_object& c ){
-      c.balance -= o.fee;
+      c.liquid_balance -= o.fee;
    });
 
    const auto& new_account = _db.create< account_object >( [&]( account_object& acc )
@@ -309,8 +309,8 @@ void account_create_with_delegation_evaluator::do_apply( const account_create_wi
    const auto& props = _db.get_dynamic_global_properties();
    const witness_schedule_object& wso = _db.get_witness_schedule_object();
 
-   FC_ASSERT( creator.balance >= o.fee, "Insufficient balance to create account.",
-               ( "creator.balance", creator.balance )
+   FC_ASSERT( creator.liquid_balance >= o.fee, "Insufficient balance to create account.",
+               ( "creator.liquid_balance", creator.liquid_balance )
                ( "required", o.fee ) );
 
    FC_ASSERT( creator.vesting_shares - creator.delegated_vesting_shares - asset( creator.to_withdraw - creator.withdrawn, VESTS_SYMBOL ) >= o.delegation, "Insufficient vesting shares to delegate to new account.",
@@ -357,7 +357,7 @@ void account_create_with_delegation_evaluator::do_apply( const account_create_wi
 
    _db.modify( creator, [&]( account_object& c )
    {
-      c.balance -= o.fee;
+      c.liquid_balance -= o.fee;
       c.delegated_vesting_shares += o.delegation;
    });
 
@@ -736,18 +736,18 @@ void escrow_transfer_evaluator::do_apply( const escrow_transfer_operation& o )
       FC_ASSERT( o.ratification_deadline > _db.head_block_time(), "The escorw ratification deadline must be after head block time." );
       FC_ASSERT( o.escrow_expiration > _db.head_block_time(), "The escrow expiration must be after head block time." );
 
-      asset ztr_spent = o.ztr_amount;
-      asset zbd_spent = o.zbd_amount;
+      asset liquid_spent = o.liquid_amount;
+      asset dollars_spent = o.dollar_amount;
       if( o.fee.symbol == ZTR_SYMBOL )
-         ztr_spent += o.fee;
+         liquid_spent += o.fee;
       else
-         zbd_spent += o.fee;
+         dollars_spent += o.fee;
 
-      FC_ASSERT( from_account.balance >= ztr_spent, "Account cannot cover ZTR costs of escrow. Required: ${r} Available: ${a}", ("r",ztr_spent)("a",from_account.balance) );
-      FC_ASSERT( from_account.zbd_balance >= zbd_spent, "Account cannot cover ZBD costs of escrow. Required: ${r} Available: ${a}", ("r",zbd_spent)("a",from_account.zbd_balance) );
+      FC_ASSERT( from_account.liquid_balance >= liquid_spent, "Account cannot cover ZTR costs of escrow. Required: ${r} Available: ${a}", ("r",liquid_spent)("a",from_account.liquid_balance) );
+      FC_ASSERT( from_account.dollar_balance >= dollars_spent, "Account cannot cover ZBD costs of escrow. Required: ${r} Available: ${a}", ("r",dollars_spent)("a",from_account.dollar_balance) );
 
-      _db.adjust_balance( from_account, -ztr_spent );
-      _db.adjust_balance( from_account, -zbd_spent );
+      _db.adjust_balance( from_account, -liquid_spent );
+      _db.adjust_balance( from_account, -dollars_spent );
 
       _db.create<escrow_object>([&]( escrow_object& esc )
       {
@@ -757,8 +757,8 @@ void escrow_transfer_evaluator::do_apply( const escrow_transfer_operation& o )
          esc.agent                  = o.agent;
          esc.ratification_deadline  = o.ratification_deadline;
          esc.escrow_expiration      = o.escrow_expiration;
-         esc.zbd_balance            = o.zbd_amount;
-         esc.ztr_balance            = o.ztr_amount;
+         esc.dollar_balance            = o.dollar_amount;
+         esc.liquid_balance            = o.liquid_amount;
          esc.pending_fee            = o.fee;
       });
    }
@@ -805,8 +805,8 @@ void escrow_approve_evaluator::do_apply( const escrow_approve_operation& o )
 
       if( reject_escrow )
       {
-         _db.adjust_balance( o.from, escrow.ztr_balance );
-         _db.adjust_balance( o.from, escrow.zbd_balance );
+         _db.adjust_balance( o.from, escrow.liquid_balance );
+         _db.adjust_balance( o.from, escrow.dollar_balance );
          _db.adjust_balance( o.from, escrow.pending_fee );
 
          _db.remove( escrow );
@@ -852,8 +852,8 @@ void escrow_release_evaluator::do_apply( const escrow_release_operation& o )
       _db.get_account(o.from); // Verify from account exists
 
       const auto& e = _db.get_escrow( o.from, o.escrow_id );
-      FC_ASSERT( e.ztr_balance >= o.ztr_amount, "Release amount exceeds escrow balance. Amount: ${a}, Balance: ${b}", ("a", o.ztr_amount)("b", e.ztr_balance) );
-      FC_ASSERT( e.zbd_balance >= o.zbd_amount, "Release amount exceeds escrow balance. Amount: ${a}, Balance: ${b}", ("a", o.zbd_amount)("b", e.zbd_balance) );
+      FC_ASSERT( e.liquid_balance >= o.liquid_amount, "Release amount exceeds escrow balance. Amount: ${a}, Balance: ${b}", ("a", o.liquid_amount)("b", e.liquid_balance) );
+      FC_ASSERT( e.dollar_balance >= o.dollar_amount, "Release amount exceeds escrow balance. Amount: ${a}, Balance: ${b}", ("a", o.dollar_amount)("b", e.dollar_balance) );
       FC_ASSERT( e.to == o.to, "Operation 'to' (${o}) does not match escrow 'to' (${e}).", ("o", o.to)("e", e.to) );
       FC_ASSERT( e.agent == o.agent, "Operation 'agent' (${a}) does not match escrow 'agent' (${e}).", ("o", o.agent)("e", e.agent) );
       FC_ASSERT( o.receiver == e.from || o.receiver == e.to, "Funds must be released to 'from' (${f}) or 'to' (${t})", ("f", e.from)("t", e.to) );
@@ -883,16 +883,16 @@ void escrow_release_evaluator::do_apply( const escrow_release_operation& o )
       }
       // If escrow expires and there is no dispute, either party can release funds to either party.
 
-      _db.adjust_balance( o.receiver, o.ztr_amount );
-      _db.adjust_balance( o.receiver, o.zbd_amount );
+      _db.adjust_balance( o.receiver, o.liquid_amount );
+      _db.adjust_balance( o.receiver, o.dollar_amount );
 
       _db.modify( e, [&]( escrow_object& esc )
       {
-         esc.ztr_balance -= o.ztr_amount;
-         esc.zbd_balance -= o.zbd_amount;
+         esc.liquid_balance -= o.liquid_amount;
+         esc.dollar_balance -= o.dollar_amount;
       });
 
-      if( e.ztr_balance.amount == 0 && e.zbd_balance.amount == 0 )
+      if( e.liquid_balance.amount == 0 && e.dollar_balance.amount == 0 )
       {
          _db.remove( e );
       }
@@ -1456,8 +1456,8 @@ void feed_publish_evaluator::do_apply( const feed_publish_operation& o )
    const auto& witness = _db.get_witness( o.publisher );
    _db.modify( witness, [&]( witness_object& w )
    {
-      w.zbd_exchange_rate = o.exchange_rate;
-      w.last_zbd_exchange_update = _db.head_block_time();
+      w.dollar_exchange_rate = o.exchange_rate;
+      w.last_dollar_exchange_update = _db.head_block_time();
    });
 }
 
@@ -1546,7 +1546,7 @@ void claim_account_evaluator::do_apply( const claim_account_operation& o )
    const auto& creator = _db.get_account( o.creator );
    const auto& wso = _db.get_witness_schedule_object();
 
-   FC_ASSERT( creator.balance >= o.fee, "Insufficient balance to create account.", ( "creator.balance", creator.balance )( "required", o.fee ) );
+   FC_ASSERT( creator.liquid_balance >= o.fee, "Insufficient balance to create account.", ( "creator.liquid_balance", creator.liquid_balance )( "required", o.fee ) );
 
    FC_ASSERT( o.fee >= wso.median_props.account_creation_fee, "Insufficient Fee: ${f} required, ${p} provided.",
                ("f", wso.median_props.account_creation_fee)
@@ -1561,7 +1561,7 @@ void claim_account_evaluator::do_apply( const claim_account_operation& o )
 
    _db.modify( creator, [&]( account_object& a )
    {
-      a.balance -= o.fee;
+      a.liquid_balance -= o.fee;
       a.pending_claimed_accounts++;
    });
 }
@@ -1730,7 +1730,7 @@ void transfer_to_savings_evaluator::do_apply( const transfer_to_savings_operatio
    FC_ASSERT( _db.get_balance( from, op.amount.symbol ) >= op.amount, "Account does not have sufficient funds to transfer to savings." );
 
    _db.adjust_balance( from, -op.amount );
-   _db.adjust_savings_balance( to, op.amount );
+   _db.adjust_savings_liquid_balance( to, op.amount );
 }
 
 void transfer_from_savings_evaluator::do_apply( const transfer_from_savings_operation& op )
@@ -1740,8 +1740,8 @@ void transfer_from_savings_evaluator::do_apply( const transfer_from_savings_oper
 
    FC_ASSERT( from.savings_withdraw_requests < ZATTERA_SAVINGS_WITHDRAW_REQUEST_LIMIT, "Account has reached limit for pending withdraw requests." );
 
-   FC_ASSERT( _db.get_savings_balance( from, op.amount.symbol ) >= op.amount );
-   _db.adjust_savings_balance( from, -op.amount );
+   FC_ASSERT( _db.get_savings_liquid_balance( from, op.amount.symbol ) >= op.amount );
+   _db.adjust_savings_liquid_balance( from, -op.amount );
    _db.create<savings_withdraw_object>( [&]( savings_withdraw_object& s ) {
       s.from   = op.from;
       s.to     = op.to;
@@ -1762,7 +1762,7 @@ void transfer_from_savings_evaluator::do_apply( const transfer_from_savings_oper
 void cancel_transfer_from_savings_evaluator::do_apply( const cancel_transfer_from_savings_operation& op )
 {
    const auto& swo = _db.get_savings_withdraw( op.from, op.request_id );
-   _db.adjust_savings_balance( _db.get_account( swo.from ), swo.amount );
+   _db.adjust_savings_liquid_balance( _db.get_account( swo.from ), swo.amount );
    _db.remove( swo );
 
    const auto& from = _db.get_account( op.from );
@@ -1830,39 +1830,39 @@ void claim_reward_balance_evaluator::do_apply( const claim_reward_balance_operat
 {
    const auto& acnt = _db.get_account( op.account );
 
-   FC_ASSERT( op.reward_ztr <= acnt.reward_ztr_balance, "Cannot claim that much ZTR. Claim: ${c} Actual: ${a}",
-      ("c", op.reward_ztr)("a", acnt.reward_ztr_balance) );
-   FC_ASSERT( op.reward_zbd <= acnt.reward_zbd_balance, "Cannot claim that much ZBD. Claim: ${c} Actual: ${a}",
-      ("c", op.reward_zbd)("a", acnt.reward_zbd_balance) );
-   FC_ASSERT( op.reward_vests <= acnt.reward_vesting_balance, "Cannot claim that much VESTS. Claim: ${c} Actual: ${a}",
-      ("c", op.reward_vests)("a", acnt.reward_vesting_balance) );
+   FC_ASSERT( op.reward_liquids <= acnt.reward_liquid_balance, "Cannot claim that much ZTR. Claim: ${c} Actual: ${a}",
+      ("c", op.reward_liquids)("a", acnt.reward_liquid_balance) );
+   FC_ASSERT( op.reward_dollars <= acnt.reward_dollar_balance, "Cannot claim that much ZBD. Claim: ${c} Actual: ${a}",
+      ("c", op.reward_dollars)("a", acnt.reward_dollar_balance) );
+   FC_ASSERT( op.reward_vests <= acnt.reward_vesting_share_balance, "Cannot claim that much VESTS. Claim: ${c} Actual: ${a}",
+      ("c", op.reward_vests)("a", acnt.reward_vesting_share_balance) );
 
-   asset reward_vesting_ztr_to_move = asset( 0, ZTR_SYMBOL );
-   if( op.reward_vests == acnt.reward_vesting_balance )
-      reward_vesting_ztr_to_move = acnt.reward_vesting_ztr;
+   asset reward_vesting_liquid_to_move = asset( 0, ZTR_SYMBOL );
+   if( op.reward_vests == acnt.reward_vesting_share_balance )
+      reward_vesting_liquid_to_move = acnt.reward_vesting_liquid_balance;
    else
-      reward_vesting_ztr_to_move = asset( ( ( uint128_t( op.reward_vests.amount.value ) * uint128_t( acnt.reward_vesting_ztr.amount.value ) )
-         / uint128_t( acnt.reward_vesting_balance.amount.value ) ).to_uint64(), ZTR_SYMBOL );
+      reward_vesting_liquid_to_move = asset( ( ( uint128_t( op.reward_vests.amount.value ) * uint128_t( acnt.reward_vesting_liquid_balance.amount.value ) )
+         / uint128_t( acnt.reward_vesting_share_balance.amount.value ) ).to_uint64(), ZTR_SYMBOL );
 
-   _db.adjust_reward_balance( acnt, -op.reward_ztr );
-   _db.adjust_reward_balance( acnt, -op.reward_zbd );
-   _db.adjust_balance( acnt, op.reward_ztr );
-   _db.adjust_balance( acnt, op.reward_zbd );
+   _db.adjust_reward_balance( acnt, -op.reward_liquids );
+   _db.adjust_reward_balance( acnt, -op.reward_dollars );
+   _db.adjust_balance( acnt, op.reward_liquids );
+   _db.adjust_balance( acnt, op.reward_dollars );
 
    _db.modify( acnt, [&]( account_object& a )
    {
       a.vesting_shares += op.reward_vests;
-      a.reward_vesting_balance -= op.reward_vests;
-      a.reward_vesting_ztr -= reward_vesting_ztr_to_move;
+      a.reward_vesting_share_balance -= op.reward_vests;
+      a.reward_vesting_liquid_balance -= reward_vesting_liquid_to_move;
    });
 
    _db.modify( _db.get_dynamic_global_properties(), [&]( dynamic_global_property_object& gpo )
    {
       gpo.total_vesting_shares += op.reward_vests;
-      gpo.total_vesting_fund_ztr += reward_vesting_ztr_to_move;
+      gpo.total_vesting_fund_liquid += reward_vesting_liquid_to_move;
 
       gpo.pending_rewarded_vesting_shares -= op.reward_vests;
-      gpo.pending_rewarded_vesting_ztr -= reward_vesting_ztr_to_move;
+      gpo.pending_rewarded_vesting_liquid -= reward_vesting_liquid_to_move;
    });
 
    _db.adjust_proxied_witness_votes( acnt, op.reward_vests.amount );

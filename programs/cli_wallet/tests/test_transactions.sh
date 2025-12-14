@@ -93,7 +93,7 @@ test_command "Account Update" "update_account_memo_key \"testaccount\" ZTR5RqVBA
 # 3. Witness Commands
 echo -e "\n${YELLOW}=== 3. WITNESS TRANSACTION COMMANDS ===${NC}"
 
-test_command "Witness" "update_witness \"witnessaccount\" \"http://witness.url\" ZTR5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh {\"account_creation_fee\":\"0.100 ZTR\",\"maximum_block_size\":131072,\"zbd_interest_rate\":1000} false"
+test_command "Witness" "update_witness \"witnessaccount\" \"http://witness.url\" ZTR5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh {\"account_creation_fee\":\"0.100 ZTR\",\"maximum_block_size\":131072,\"dollar_interest_rate\":1000} false"
 test_command "Witness" "vote_for_witness \"voter\" \"witness\" true false"
 test_command "Witness" "set_voting_proxy \"account\" \"proxy\" false"
 test_command "Witness" "publish_feed \"witness\" {\"base\":\"1.000 ZBD\",\"quote\":\"1.000 ZTR\"} false"
@@ -123,7 +123,7 @@ echo -e "\n${YELLOW}=== 6. MARKET/TRADING COMMANDS ===${NC}"
 
 test_command "Market" "create_order \"owner\" 1 \"1.000 ZBD\" \"1.000 ZTR\" false 3600 false"
 test_command "Market" "cancel_order \"owner\" 1 false"
-test_command "Market" "convert_zbd \"from\" \"1.000 ZBD\" false"
+test_command "Market" "convert_dollar \"from\" \"1.000 ZBD\" false"
 
 # 7. Content Commands
 echo -e "\n${YELLOW}=== 7. CONTENT COMMANDS ===${NC}"

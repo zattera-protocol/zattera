@@ -72,7 +72,7 @@ struct reward_fund_context
 {
    uint128_t   recent_claims = 0;
    asset       reward_balance = asset( 0, ZTR_SYMBOL );
-   share_type  ztr_awarded = 0;
+   share_type  liquid_awarded = 0;
 };
 
 class database_impl
@@ -110,7 +110,7 @@ void database::open( const open_args& args )
       if( !find< dynamic_global_property_object >() )
          with_write_lock( [&]()
          {
-            init_genesis( args.initial_supply, args.zbd_initial_supply );
+            init_genesis( args.initial_supply, args.dollar_initial_supply );
          });
 
       _benchmark_dumper.set_enabled( args.benchmark_is_enabled );
@@ -1108,13 +1108,13 @@ uint32_t database::get_slot_at_time(fc::time_point_sec when)const
  *  Converts ZTR into ZBD and adds it to to_account while reducing the ZTR supply
  *  by ZTR and increasing the ZBD supply by the specified amount.
  */
-std::pair< asset, asset > database::create_zbd( const account_object& to_account, asset ztr, bool to_reward_balance )
+std::pair< asset, asset > database::create_dollar( const account_object& to_account, asset liquid, bool to_reward_balance )
 {
    std::pair< asset, asset > assets( asset( 0, ZBD_SYMBOL ), asset( 0, ZTR_SYMBOL ) );
 
    try
    {
-      if( ztr.amount == 0 )
+      if( liquid.amount == 0 )
          return assets;
 
       const auto& median_price = get_feed_history().current_median_history;
@@ -1122,34 +1122,34 @@ std::pair< asset, asset > database::create_zbd( const account_object& to_account
 
       if( !median_price.is_null() )
       {
-         auto to_zbd = ( gpo.zbd_print_rate * ztr.amount ) / ZATTERA_100_PERCENT;
-         auto to_ztr = ztr.amount - to_zbd;
+         auto to_dollar = ( gpo.dollar_print_rate * liquid.amount ) / ZATTERA_100_PERCENT;
+         auto to_liquid = liquid.amount - to_dollar;
 
-         auto zbd = asset( to_zbd, ZTR_SYMBOL ) * median_price;
+         auto dollars = asset( to_dollar, ZTR_SYMBOL ) * median_price;
 
          if( to_reward_balance )
          {
-            adjust_reward_balance( to_account, zbd );
-            adjust_reward_balance( to_account, asset( to_ztr, ZTR_SYMBOL ) );
+            adjust_reward_balance( to_account, dollars );
+            adjust_reward_balance( to_account, asset( to_liquid, ZTR_SYMBOL ) );
          }
          else
          {
-            adjust_balance( to_account, zbd );
-            adjust_balance( to_account, asset( to_ztr, ZTR_SYMBOL ) );
+            adjust_balance( to_account, dollars );
+            adjust_balance( to_account, asset( to_liquid, ZTR_SYMBOL ) );
          }
 
-         adjust_supply( asset( -to_zbd, ZTR_SYMBOL ) );
-         adjust_supply( zbd );
-         assets.first = zbd;
-         assets.second = asset( to_ztr, ZTR_SYMBOL );
+         adjust_supply( asset( -to_dollar, ZTR_SYMBOL ) );
+         adjust_supply( dollars );
+         assets.first = dollars;
+         assets.second = asset( to_liquid, ZTR_SYMBOL );
       }
       else
       {
-         adjust_balance( to_account, ztr );
-         assets.second = ztr;
+         adjust_balance( to_account, liquid );
+         assets.second = liquid;
       }
    }
-   FC_CAPTURE_LOG_AND_RETHROW( (to_account.name)(ztr) )
+   FC_CAPTURE_LOG_AND_RETHROW( (to_account.name)(liquid) )
 
    return assets;
 }
@@ -1165,7 +1165,7 @@ asset database::create_vesting( const account_object& to_account, asset liquid, 
       auto calculate_new_vesting = [ liquid ] ( price vesting_share_price ) -> asset
          {
          /**
-          *  The ratio of total_vesting_shares / total_vesting_fund_ztr should not
+          *  The ratio of total_vesting_shares / total_vesting_fund_liquid should not
           *  change as the result of the user adding funds
           *
           *  V / C  = (V+Vn) / (C+Cn)
@@ -1199,11 +1199,11 @@ asset database::create_vesting( const account_object& to_account, asset liquid, 
          if( to_reward_balance )
          {
             props.pending_rewarded_vesting_shares += new_vesting;
-            props.pending_rewarded_vesting_ztr += liquid;
+            props.pending_rewarded_vesting_liquid += liquid;
          }
          else
          {
-            props.total_vesting_fund_ztr += liquid;
+            props.total_vesting_fund_liquid += liquid;
             props.total_vesting_shares += new_vesting;
          }
       } );
@@ -1321,42 +1321,42 @@ void database::clear_witness_votes( const account_object& a )
 void database::clear_null_account_balance()
 {
    const auto& null_account = get_account( ZATTERA_NULL_ACCOUNT );
-   asset total_ztr( 0, ZTR_SYMBOL );
-   asset total_zbd( 0, ZBD_SYMBOL );
+   asset total_liquid( 0, ZTR_SYMBOL );
+   asset total_dollars( 0, ZBD_SYMBOL );
 
-   if( null_account.balance.amount > 0 )
+   if( null_account.liquid_balance.amount > 0 )
    {
-      total_ztr += null_account.balance;
-      adjust_balance( null_account, -null_account.balance );
+      total_liquid += null_account.liquid_balance;
+      adjust_balance( null_account, -null_account.liquid_balance );
    }
 
-   if( null_account.savings_balance.amount > 0 )
+   if( null_account.savings_liquid_balance.amount > 0 )
    {
-      total_ztr += null_account.savings_balance;
-      adjust_savings_balance( null_account, -null_account.savings_balance );
+      total_liquid += null_account.savings_liquid_balance;
+      adjust_savings_liquid_balance( null_account, -null_account.savings_liquid_balance );
    }
 
-   if( null_account.zbd_balance.amount > 0 )
+   if( null_account.dollar_balance.amount > 0 )
    {
-      total_zbd += null_account.zbd_balance;
-      adjust_balance( null_account, -null_account.zbd_balance );
+      total_dollars += null_account.dollar_balance;
+      adjust_balance( null_account, -null_account.dollar_balance );
    }
 
-   if( null_account.savings_zbd_balance.amount > 0 )
+   if( null_account.savings_dollar_balance.amount > 0 )
    {
-      total_zbd += null_account.savings_zbd_balance;
-      adjust_savings_balance( null_account, -null_account.savings_zbd_balance );
+      total_dollars += null_account.savings_dollar_balance;
+      adjust_savings_liquid_balance( null_account, -null_account.savings_dollar_balance );
    }
 
    if( null_account.vesting_shares.amount > 0 )
    {
       const auto& gpo = get_dynamic_global_properties();
-      auto converted_ztr = null_account.vesting_shares * gpo.get_vesting_share_price();
+      auto converted_liquid = null_account.vesting_shares * gpo.get_vesting_share_price();
 
       modify( gpo, [&]( dynamic_global_property_object& g )
       {
          g.total_vesting_shares -= null_account.vesting_shares;
-         g.total_vesting_fund_ztr -= converted_ztr;
+         g.total_vesting_fund_liquid -= converted_liquid;
       });
 
       modify( null_account, [&]( account_object& a )
@@ -1364,45 +1364,45 @@ void database::clear_null_account_balance()
          a.vesting_shares.amount = 0;
       });
 
-      total_ztr += converted_ztr;
+      total_liquid += converted_liquid;
    }
 
-   if( null_account.reward_ztr_balance.amount > 0 )
+   if( null_account.reward_liquid_balance.amount > 0 )
    {
-      total_ztr += null_account.reward_ztr_balance;
-      adjust_reward_balance( null_account, -null_account.reward_ztr_balance );
+      total_liquid += null_account.reward_liquid_balance;
+      adjust_reward_balance( null_account, -null_account.reward_liquid_balance );
    }
 
-   if( null_account.reward_zbd_balance.amount > 0 )
+   if( null_account.reward_dollar_balance.amount > 0 )
    {
-      total_zbd += null_account.reward_zbd_balance;
-      adjust_reward_balance( null_account, -null_account.reward_zbd_balance );
+      total_dollars += null_account.reward_dollar_balance;
+      adjust_reward_balance( null_account, -null_account.reward_dollar_balance );
    }
 
-   if( null_account.reward_vesting_balance.amount > 0 )
+   if( null_account.reward_vesting_share_balance.amount > 0 )
    {
       const auto& gpo = get_dynamic_global_properties();
 
-      total_ztr += null_account.reward_vesting_ztr;
+      total_liquid += null_account.reward_vesting_liquid_balance;
 
       modify( gpo, [&]( dynamic_global_property_object& g )
       {
-         g.pending_rewarded_vesting_shares -= null_account.reward_vesting_balance;
-         g.pending_rewarded_vesting_ztr -= null_account.reward_vesting_ztr;
+         g.pending_rewarded_vesting_shares -= null_account.reward_vesting_share_balance;
+         g.pending_rewarded_vesting_liquid -= null_account.reward_vesting_liquid_balance;
       });
 
       modify( null_account, [&]( account_object& a )
       {
-         a.reward_vesting_ztr.amount = 0;
-         a.reward_vesting_balance.amount = 0;
+         a.reward_vesting_liquid_balance.amount = 0;
+         a.reward_vesting_share_balance.amount = 0;
       });
    }
 
-   if( total_ztr.amount > 0 )
-      adjust_supply( -total_ztr );
+   if( total_liquid.amount > 0 )
+      adjust_supply( -total_liquid );
 
-   if( total_zbd.amount > 0 )
-      adjust_supply( -total_zbd );
+   if( total_dollars.amount > 0 )
+      adjust_supply( -total_dollars );
 }
 
 /**
@@ -1465,11 +1465,11 @@ void database::process_vesting_withdrawals()
       else
          to_withdraw = std::min( from_account.vesting_shares.amount, from_account.vesting_withdraw_rate.amount ).value;
 
-      share_type vests_deposited_as_ztr = 0;
+      share_type vests_deposited_as_liquid = 0;
       share_type vests_deposited_as_vests = 0;
-      asset total_ztr_converted = asset( 0, ZTR_SYMBOL );
+      asset total_liquid_converted = asset( 0, ZTR_SYMBOL );
 
-      // Do two passes, the first for vests, the second for ztr. Try to maintain as much accuracy for vests as possible.
+      // Do two passes, the first for vests, the second for liquid. Try to maintain as much accuracy for vests as possible.
       for( auto itr = didx.upper_bound( boost::make_tuple( from_account.name, account_name_type() ) );
            itr != didx.end() && itr->from_account == from_account.name;
            ++itr )
@@ -1504,37 +1504,37 @@ void database::process_vesting_withdrawals()
             const auto& to_account = get< account_object, by_name >( itr->to_account );
 
             share_type to_deposit = ( ( fc::uint128_t ( to_withdraw.value ) * itr->percent ) / ZATTERA_100_PERCENT ).to_uint64();
-            vests_deposited_as_ztr += to_deposit;
-            auto converted_ztr = asset( to_deposit, VESTS_SYMBOL ) * cprops.get_vesting_share_price();
-            total_ztr_converted += converted_ztr;
+            vests_deposited_as_liquid += to_deposit;
+            auto converted_liquid = asset( to_deposit, VESTS_SYMBOL ) * cprops.get_vesting_share_price();
+            total_liquid_converted += converted_liquid;
 
             if( to_deposit > 0 )
             {
                modify( to_account, [&]( account_object& a )
                {
-                  a.balance += converted_ztr;
+                  a.liquid_balance += converted_liquid;
                });
 
                modify( cprops, [&]( dynamic_global_property_object& o )
                {
-                  o.total_vesting_fund_ztr -= converted_ztr;
+                  o.total_vesting_fund_liquid -= converted_liquid;
                   o.total_vesting_shares.amount -= to_deposit;
                });
 
-               push_virtual_operation( fill_vesting_withdraw_operation( from_account.name, to_account.name, asset( to_deposit, VESTS_SYMBOL), converted_ztr ) );
+               push_virtual_operation( fill_vesting_withdraw_operation( from_account.name, to_account.name, asset( to_deposit, VESTS_SYMBOL), converted_liquid ) );
             }
          }
       }
 
-      share_type to_convert = to_withdraw - vests_deposited_as_ztr - vests_deposited_as_vests;
+      share_type to_convert = to_withdraw - vests_deposited_as_liquid - vests_deposited_as_vests;
       FC_ASSERT( to_convert >= 0, "Deposited more vests than were supposed to be withdrawn" );
 
-      auto converted_ztr = asset( to_convert, VESTS_SYMBOL ) * cprops.get_vesting_share_price();
+      auto converted_liquid = asset( to_convert, VESTS_SYMBOL ) * cprops.get_vesting_share_price();
 
       modify( from_account, [&]( account_object& a )
       {
          a.vesting_shares.amount -= to_withdraw;
-         a.balance += converted_ztr;
+         a.liquid_balance += converted_liquid;
          a.withdrawn += to_withdraw;
 
          if( a.withdrawn >= a.to_withdraw || a.vesting_shares.amount == 0 )
@@ -1550,24 +1550,24 @@ void database::process_vesting_withdrawals()
 
       modify( cprops, [&]( dynamic_global_property_object& o )
       {
-         o.total_vesting_fund_ztr -= converted_ztr;
+         o.total_vesting_fund_liquid -= converted_liquid;
          o.total_vesting_shares.amount -= to_convert;
       });
 
       if( to_withdraw > 0 )
          adjust_proxied_witness_votes( from_account, -to_withdraw );
 
-      push_virtual_operation( fill_vesting_withdraw_operation( from_account.name, from_account.name, asset( to_convert, VESTS_SYMBOL ), converted_ztr ) );
+      push_virtual_operation( fill_vesting_withdraw_operation( from_account.name, from_account.name, asset( to_convert, VESTS_SYMBOL ), converted_liquid ) );
    }
 }
 
-void database::adjust_total_payout( const comment_object& cur, const asset& zbd_created, const asset& curator_zbd_value, const asset& beneficiary_value )
+void database::adjust_total_payout( const comment_object& cur, const asset& dollars_created, const asset& curator_dollar_value, const asset& beneficiary_value )
 {
    modify( cur, [&]( comment_object& c )
    {
-      // input assets should be in zbd
-      c.total_payout_value += zbd_created;
-      c.curator_payout_value += curator_zbd_value;
+      // input assets should be in dollars
+      c.total_payout_value += dollars_created;
+      c.curator_payout_value += curator_dollar_value;
       c.beneficiary_payout_value += beneficiary_value;
    } );
    /// TODO: potentially modify author's total payout numbers as well
@@ -1646,7 +1646,7 @@ void fill_comment_reward_context_local_state( util::comment_reward_context& ctx,
 {
    ctx.rshares = comment.net_rshares;
    ctx.reward_weight = comment.reward_weight;
-   ctx.max_zbd = comment.max_accepted_payout;
+   ctx.max_dollars = comment.max_accepted_payout;
 }
 
 share_type database::cashout_comment_helper( util::comment_reward_context& ctx, const comment_object& comment, bool forward_curation_remainder )
@@ -1689,17 +1689,17 @@ share_type database::cashout_comment_helper( util::comment_reward_context& ctx, 
 
             author_tokens -= total_beneficiary;
 
-            auto zbd_amount  = ( author_tokens * comment.percent_zattera_dollars ) / ( 2 * ZATTERA_100_PERCENT ) ;
-            auto vesting_ztr = author_tokens - zbd_amount;
+            auto dollar_amount  = ( author_tokens * comment.percent_zattera_dollars ) / ( 2 * ZATTERA_100_PERCENT ) ;
+            auto vesting_liquid = author_tokens - dollar_amount;
 
             const auto& author = get_account( comment.author );
-            auto vest_created = create_vesting( author, asset( vesting_ztr, ZTR_SYMBOL ), true );
-            auto zbd_payout = create_zbd( author, asset( zbd_amount, ZTR_SYMBOL ), true );
+            auto vest_created = create_vesting( author, asset( vesting_liquid, ZTR_SYMBOL ), true );
+            auto dollar_payout = create_dollar( author, asset( dollar_amount, ZTR_SYMBOL ), true );
 
-            adjust_total_payout( comment, zbd_payout.first + to_zbd( zbd_payout.second + asset( vesting_ztr, ZTR_SYMBOL ) ), to_zbd( asset( curation_tokens, ZTR_SYMBOL ) ), to_zbd( asset( total_beneficiary, ZTR_SYMBOL ) ) );
+            adjust_total_payout( comment, dollar_payout.first + to_dollar( dollar_payout.second + asset( vesting_liquid, ZTR_SYMBOL ) ), to_dollar( asset( curation_tokens, ZTR_SYMBOL ) ), to_dollar( asset( total_beneficiary, ZTR_SYMBOL ) ) );
 
-            push_virtual_operation( author_reward_operation( comment.author, to_string( comment.permlink ), zbd_payout.first, zbd_payout.second, vest_created ) );
-            push_virtual_operation( comment_reward_operation( comment.author, to_string( comment.permlink ), to_zbd( asset( claimed_reward, ZTR_SYMBOL ) ) ) );
+            push_virtual_operation( author_reward_operation( comment.author, to_string( comment.permlink ), dollar_payout.first, dollar_payout.second, vest_created ) );
+            push_virtual_operation( comment_reward_operation( comment.author, to_string( comment.permlink ), to_dollar( asset( claimed_reward, ZTR_SYMBOL ) ) ) );
 
             #ifndef IS_LOW_MEM
                modify( comment, [&]( comment_object& c )
@@ -1765,10 +1765,10 @@ share_type database::cashout_comment_helper( util::comment_reward_context& ctx, 
 void database::process_comment_cashout()
 {
    util::comment_reward_context ctx;
-   ctx.current_ztr_price = get_feed_history().current_median_history;
+   ctx.current_liquid_price = get_feed_history().current_median_history;
 
    vector< reward_fund_context > funds;
-   vector< share_type > ztr_awarded;
+   vector< share_type > liquid_awarded;
    const auto& reward_idx = get_index< reward_fund_index, by_id >();
 
    // Decay recent rshares of each fund
@@ -1827,11 +1827,11 @@ void database::process_comment_cashout()
    {
       auto fund_id = get_reward_fund( *current ).id._id;
       ctx.total_reward_shares2 = funds[ fund_id ].recent_claims;
-      ctx.total_reward_fund_ztr = funds[ fund_id ].reward_balance;
+      ctx.total_reward_fund_liquid = funds[ fund_id ].reward_balance;
 
       bool forward_curation_remainder = false;
 
-      funds[ fund_id ].ztr_awarded += cashout_comment_helper( ctx, *current, forward_curation_remainder );
+      funds[ fund_id ].liquid_awarded += cashout_comment_helper( ctx, *current, forward_curation_remainder );
 
       current = cidx.begin();
    }
@@ -1844,7 +1844,7 @@ void database::process_comment_cashout()
          modify( get< reward_fund_object, by_id >( reward_fund_id_type( i ) ), [&]( reward_fund_object& rfo )
          {
             rfo.recent_claims = funds[ i ].recent_claims;
-            rfo.reward_balance -= asset( funds[ i ].ztr_awarded, ZTR_SYMBOL );
+            rfo.reward_balance -= asset( funds[ i ].liquid_awarded, ZTR_SYMBOL );
          });
       }
    }
@@ -1874,13 +1874,13 @@ void database::process_funds()
    const auto& props = get_dynamic_global_properties();
    const auto& wso = get_witness_schedule_object();
 
-   bool is_bootstrap_phase = props.current_supply.amount < ZATTERA_BOOTSTRAP_SUPPLY_THRESHOLD;
-   share_type new_ztr = 0;
+   bool is_bootstrap_phase = props.current_liquid_supply.amount < ZATTERA_BOOTSTRAP_SUPPLY_THRESHOLD;
+   share_type new_liquid = 0;
 
    if( is_bootstrap_phase )
    {
       // Bootstrap Phase: Fixed block reward
-      new_ztr = ZATTERA_BOOTSTRAP_FIXED_BLOCK_REWARD;
+      new_liquid = ZATTERA_BOOTSTRAP_FIXED_BLOCK_REWARD;
    }
    else
    {
@@ -1896,12 +1896,12 @@ void database::process_funds()
       // below subtraction cannot underflow int64_t because inflation_rate_adjustment is <2^32
       int64_t current_inflation_rate = std::max( start_inflation_rate - inflation_rate_adjustment, inflation_rate_floor );
 
-      new_ztr = ( props.virtual_supply.amount * current_inflation_rate ) / ( int64_t( ZATTERA_100_PERCENT ) * int64_t( ZATTERA_BLOCKS_PER_YEAR ) );
+      new_liquid = ( props.virtual_liquid_supply.amount * current_inflation_rate ) / ( int64_t( ZATTERA_100_PERCENT ) * int64_t( ZATTERA_BLOCKS_PER_YEAR ) );
    }
 
-   auto content_reward = ( new_ztr * ZATTERA_CONTENT_REWARD_PERCENT ) / ZATTERA_100_PERCENT;
+   auto content_reward = ( new_liquid * ZATTERA_CONTENT_REWARD_PERCENT ) / ZATTERA_100_PERCENT;
    content_reward = pay_reward_funds( content_reward ); /// 75% to content creator
-   auto vesting_reward = ( new_ztr * ZATTERA_VESTING_FUND_PERCENT ) / ZATTERA_100_PERCENT; /// 15% to vesting fund
+   auto vesting_reward = ( new_liquid * ZATTERA_VESTING_FUND_PERCENT ) / ZATTERA_100_PERCENT; /// 15% to vesting fund
 
    // Only distribute vesting rewards when total_vesting_shares reaches minimum threshold
    // This prevents VESTS price volatility during initial chain bootstrap
@@ -1910,7 +1910,7 @@ void database::process_funds()
       vesting_reward = 0;
    }
 
-   auto witness_reward = new_ztr - content_reward - vesting_reward; /// Remaining 10% to witness pay
+   auto witness_reward = new_liquid - content_reward - vesting_reward; /// Remaining 10% to witness pay
 
    const auto& cwit = get_witness( props.current_witness );
 
@@ -1929,13 +1929,13 @@ void database::process_funds()
       witness_reward /= wso.witness_pay_normalization_factor;
    }
 
-   new_ztr = content_reward + vesting_reward + witness_reward;
+   new_liquid = content_reward + vesting_reward + witness_reward;
 
    modify( props, [&]( dynamic_global_property_object& p )
    {
-      p.total_vesting_fund_ztr += asset( vesting_reward, ZTR_SYMBOL );
-      p.current_supply           += asset( new_ztr, ZTR_SYMBOL );
-      p.virtual_supply           += asset( new_ztr, ZTR_SYMBOL );
+      p.total_vesting_fund_liquid += asset( vesting_reward, ZTR_SYMBOL );
+      p.current_liquid_supply           += asset( new_liquid, ZTR_SYMBOL );
+      p.virtual_liquid_supply           += asset( new_liquid, ZTR_SYMBOL );
    });
 
    const auto& producer_reward = create_vesting( get_account( cwit.owner ), asset( witness_reward, ZTR_SYMBOL ) );
@@ -1994,7 +1994,7 @@ share_type database::pay_reward_funds( share_type reward )
 
 /**
  *  Iterates over all conversion requests with a conversion date before
- *  the head block time and then converts them to/from ztr/zbd at the
+ *  the head block time and then converts them to/from liquid/dollars at the
  *  current median price feed history price times the premium
  */
 void database::process_conversions()
@@ -2007,8 +2007,8 @@ void database::process_conversions()
    if( fhistory.current_median_history.is_null() )
       return;
 
-   asset net_zbd( 0, ZBD_SYMBOL );
-   asset net_ztr( 0, ZTR_SYMBOL );
+   asset net_dollars( 0, ZBD_SYMBOL );
+   asset net_liquid( 0, ZTR_SYMBOL );
 
    while( itr != request_by_date.end() && itr->conversion_date <= now )
    {
@@ -2016,8 +2016,8 @@ void database::process_conversions()
 
       adjust_balance( itr->owner, amount_to_issue );
 
-      net_zbd   += itr->amount;
-      net_ztr += amount_to_issue;
+      net_dollars   += itr->amount;
+      net_liquid += amount_to_issue;
 
       push_virtual_operation( fill_convert_request_operation ( itr->owner, itr->requestid, itr->amount, amount_to_issue ) );
 
@@ -2028,21 +2028,21 @@ void database::process_conversions()
    const auto& props = get_dynamic_global_properties();
    modify( props, [&]( dynamic_global_property_object& p )
    {
-       p.current_supply += net_ztr;
-       p.current_zbd_supply -= net_zbd;
-       p.virtual_supply += net_ztr;
-       p.virtual_supply -= net_zbd * get_feed_history().current_median_history;
+       p.current_liquid_supply += net_liquid;
+       p.current_dollar_supply -= net_dollars;
+       p.virtual_liquid_supply += net_liquid;
+       p.virtual_liquid_supply -= net_dollars * get_feed_history().current_median_history;
    } );
 }
 
-asset database::to_zbd( const asset& ztr )const
+asset database::to_dollar( const asset& liquid )const
 {
-   return util::to_zbd( get_feed_history().current_median_history, ztr );
+   return util::to_dollar( get_feed_history().current_median_history, liquid );
 }
 
-asset database::to_ztr( const asset& zbd )const
+asset database::to_liquid( const asset& dollar )const
 {
-   return util::to_ztr( get_feed_history().current_median_history, zbd );
+   return util::to_liquid( get_feed_history().current_median_history, dollar );
 }
 
 void database::account_recovery_processing()
@@ -2093,8 +2093,8 @@ void database::expire_escrow_ratification()
       const auto& old_escrow = *escrow_itr;
       ++escrow_itr;
 
-      adjust_balance( old_escrow.from, old_escrow.ztr_balance );
-      adjust_balance( old_escrow.from, old_escrow.zbd_balance );
+      adjust_balance( old_escrow.from, old_escrow.liquid_balance );
+      adjust_balance( old_escrow.from, old_escrow.dollar_balance );
       adjust_balance( old_escrow.from, old_escrow.pending_fee );
 
       remove( old_escrow );
@@ -2316,7 +2316,7 @@ void database::init_schema()
    return;*/
 }
 
-void database::init_genesis( uint64_t initial_supply, uint64_t zbd_initial_supply )
+void database::init_genesis( uint64_t initial_supply, uint64_t dollar_initial_supply )
 {
    try
    {
@@ -2366,8 +2366,8 @@ void database::init_genesis( uint64_t initial_supply, uint64_t zbd_initial_suppl
          {
             a.name = ZATTERA_GENESIS_WITNESS_NAME + ( i ? fc::to_string( i ) : std::string() );
             a.memo_key = genesis_public_key;
-            a.balance  = asset( i ? 0 : initial_supply, ZTR_SYMBOL );
-            a.zbd_balance = asset( i ? 0 : zbd_initial_supply, ZBD_SYMBOL );
+            a.liquid_balance  = asset( i ? 0 : initial_supply, ZTR_SYMBOL );
+            a.dollar_balance = asset( i ? 0 : dollar_initial_supply, ZBD_SYMBOL );
          } );
 
          create< account_authority_object >( [&]( account_authority_object& auth )
@@ -2401,9 +2401,9 @@ void database::init_genesis( uint64_t initial_supply, uint64_t zbd_initial_suppl
          p.time = ZATTERA_GENESIS_TIME;
          p.recent_slots_filled = fc::uint128::max_value();
          p.participation_count = 128;
-         p.current_supply = asset( initial_supply, ZTR_SYMBOL );
-         p.virtual_supply = p.current_supply;
-         p.current_zbd_supply = asset( zbd_initial_supply, ZBD_SYMBOL );
+         p.current_liquid_supply = asset( initial_supply, ZTR_SYMBOL );
+         p.virtual_liquid_supply = p.current_liquid_supply;
+         p.current_dollar_supply = asset( dollar_initial_supply, ZBD_SYMBOL );
          p.maximum_block_size = ZATTERA_MAX_BLOCK_SIZE;
          p.vote_power_reserve_rate = ZATTERA_REDUCED_VOTE_POWER_RATE;
          p.delegation_return_period = ZATTERA_DELEGATION_RETURN_PERIOD;
@@ -2827,10 +2827,10 @@ try {
    for( int i = 0; i < wso.num_scheduled_witnesses; i++ )
    {
       const auto& wit = get_witness( wso.current_shuffled_witnesses[i] );
-      if( now < wit.last_zbd_exchange_update + ZATTERA_MAX_FEED_AGE_SECONDS
-         && !wit.zbd_exchange_rate.is_null() )
+      if( now < wit.last_dollar_exchange_update + ZATTERA_MAX_FEED_AGE_SECONDS
+         && !wit.dollar_exchange_rate.is_null() )
       {
-         feeds.push_back( wit.zbd_exchange_rate );
+         feeds.push_back( wit.dollar_exchange_rate );
       }
    }
 
@@ -2864,7 +2864,7 @@ try {
                return;
 #endif
             const auto& gpo = get_dynamic_global_properties();
-            price min_price( asset( 9 * gpo.current_zbd_supply.amount, ZBD_SYMBOL ), gpo.current_supply ); // This price limits ZBD to 10% market cap
+            price min_price( asset( 9 * gpo.current_dollar_supply.amount, ZBD_SYMBOL ), gpo.current_liquid_supply ); // This price limits ZBD to 10% market cap
 
             if( min_price > fho.current_median_history )
                fho.current_median_history = min_price;
@@ -3205,22 +3205,22 @@ void database::update_virtual_supply()
 { try {
    modify( get_dynamic_global_properties(), [&]( dynamic_global_property_object& dgp )
    {
-      dgp.virtual_supply = dgp.current_supply
-         + ( get_feed_history().current_median_history.is_null() ? asset( 0, ZTR_SYMBOL ) : dgp.current_zbd_supply * get_feed_history().current_median_history );
+      dgp.virtual_liquid_supply = dgp.current_liquid_supply
+         + ( get_feed_history().current_median_history.is_null() ? asset( 0, ZTR_SYMBOL ) : dgp.current_dollar_supply * get_feed_history().current_median_history );
 
       auto median_price = get_feed_history().current_median_history;
 
       if( !median_price.is_null() )
       {
-         auto percent_zbd = uint16_t( ( ( fc::uint128_t( ( dgp.current_zbd_supply * get_feed_history().current_median_history ).amount.value ) * ZATTERA_100_PERCENT )
-            / dgp.virtual_supply.amount.value ).to_uint64() );
+         auto percent_dollar = uint16_t( ( ( fc::uint128_t( ( dgp.current_dollar_supply * get_feed_history().current_median_history ).amount.value ) * ZATTERA_100_PERCENT )
+            / dgp.virtual_liquid_supply.amount.value ).to_uint64() );
 
-         if( percent_zbd <= ZATTERA_ZBD_START_PERCENT )
-            dgp.zbd_print_rate = ZATTERA_100_PERCENT;
-         else if( percent_zbd >= ZATTERA_ZBD_STOP_PERCENT )
-            dgp.zbd_print_rate = 0;
+         if( percent_dollar <= ZATTERA_ZBD_START_PERCENT )
+            dgp.dollar_print_rate = ZATTERA_100_PERCENT;
+         else if( percent_dollar >= ZATTERA_ZBD_STOP_PERCENT )
+            dgp.dollar_print_rate = 0;
          else
-            dgp.zbd_print_rate = ( ( ZATTERA_ZBD_STOP_PERCENT - percent_zbd ) * ZATTERA_100_PERCENT ) / ( ZATTERA_ZBD_STOP_PERCENT - ZATTERA_ZBD_START_PERCENT );
+            dgp.dollar_print_rate = ( ( ZATTERA_ZBD_STOP_PERCENT - percent_dollar ) * ZATTERA_100_PERCENT ) / ( ZATTERA_ZBD_STOP_PERCENT - ZATTERA_ZBD_START_PERCENT );
       }
    });
 } FC_CAPTURE_AND_RETHROW() }
@@ -3504,43 +3504,43 @@ void database::modify_balance( const account_object& a, const asset& delta, bool
       switch( delta.symbol.asset_num )
       {
          case ZATTERA_ASSET_NUM_ZTR:
-            acnt.balance += delta;
+            acnt.liquid_balance += delta;
             if( check_balance )
             {
-               FC_ASSERT( acnt.balance.amount.value >= 0, "Insufficient ZTR funds" );
+               FC_ASSERT( acnt.liquid_balance.amount.value >= 0, "Insufficient ZTR funds" );
             }
             break;
          case ZATTERA_ASSET_NUM_ZBD:
-            if( a.zbd_seconds_last_update != head_block_time() )
+            if( a.dollar_seconds_last_update != head_block_time() )
             {
-               acnt.zbd_seconds += fc::uint128_t(a.zbd_balance.amount.value) * (head_block_time() - a.zbd_seconds_last_update).to_seconds();
-               acnt.zbd_seconds_last_update = head_block_time();
+               acnt.dollar_seconds += fc::uint128_t(a.dollar_balance.amount.value) * (head_block_time() - a.dollar_seconds_last_update).to_seconds();
+               acnt.dollar_seconds_last_update = head_block_time();
 
-               if( acnt.zbd_seconds > 0 &&
-                   (acnt.zbd_seconds_last_update - acnt.zbd_last_interest_payment).to_seconds() > ZATTERA_ZBD_INTEREST_COMPOUND_INTERVAL_SEC )
+               if( acnt.dollar_seconds > 0 &&
+                   (acnt.dollar_seconds_last_update - acnt.dollar_last_interest_payment).to_seconds() > ZATTERA_ZBD_INTEREST_COMPOUND_INTERVAL_SEC )
                {
-                  auto interest = acnt.zbd_seconds / ZATTERA_SECONDS_PER_YEAR;
-                  interest *= get_dynamic_global_properties().zbd_interest_rate;
+                  auto interest = acnt.dollar_seconds / ZATTERA_SECONDS_PER_YEAR;
+                  interest *= get_dynamic_global_properties().dollar_interest_rate;
                   interest /= ZATTERA_100_PERCENT;
                   asset interest_paid(interest.to_uint64(), ZBD_SYMBOL);
-                  acnt.zbd_balance += interest_paid;
-                  acnt.zbd_seconds = 0;
-                  acnt.zbd_last_interest_payment = head_block_time();
+                  acnt.dollar_balance += interest_paid;
+                  acnt.dollar_seconds = 0;
+                  acnt.dollar_last_interest_payment = head_block_time();
 
                   if(interest > 0)
                      push_virtual_operation( interest_operation( a.name, interest_paid ) );
 
                   modify( get_dynamic_global_properties(), [&]( dynamic_global_property_object& props)
                   {
-                     props.current_zbd_supply += interest_paid;
-                     props.virtual_supply += interest_paid * get_feed_history().current_median_history;
+                     props.current_dollar_supply += interest_paid;
+                     props.virtual_liquid_supply += interest_paid * get_feed_history().current_median_history;
                   } );
                }
             }
-            acnt.zbd_balance += delta;
+            acnt.dollar_balance += delta;
             if( check_balance )
             {
-               FC_ASSERT( acnt.zbd_balance.amount.value >= 0, "Insufficient ZBD funds" );
+               FC_ASSERT( acnt.dollar_balance.amount.value >= 0, "Insufficient ZBD funds" );
             }
             break;
          case ZATTERA_ASSET_NUM_VESTS:
@@ -3565,28 +3565,28 @@ void database::modify_reward_balance( const account_object& a, const asset& valu
          case ZATTERA_ASSET_NUM_ZTR:
             if( share_delta.amount.value == 0 )
             {
-               acnt.reward_ztr_balance += value_delta;
+               acnt.reward_liquid_balance += value_delta;
                if( check_balance )
                {
-                  FC_ASSERT( acnt.reward_ztr_balance.amount.value >= 0, "Insufficient reward ZTR funds" );
+                  FC_ASSERT( acnt.reward_liquid_balance.amount.value >= 0, "Insufficient reward ZTR funds" );
                }
             }
             else
             {
-               acnt.reward_vesting_ztr += value_delta;
-               acnt.reward_vesting_balance += share_delta;
+               acnt.reward_vesting_liquid_balance += value_delta;
+               acnt.reward_vesting_share_balance += share_delta;
                if( check_balance )
                {
-                  FC_ASSERT( acnt.reward_vesting_balance.amount.value >= 0, "Insufficient reward VESTS funds" );
+                  FC_ASSERT( acnt.reward_vesting_share_balance.amount.value >= 0, "Insufficient reward VESTS funds" );
                }
             }
             break;
          case ZATTERA_ASSET_NUM_ZBD:
             FC_ASSERT( share_delta.amount.value == 0 );
-            acnt.reward_zbd_balance += value_delta;
+            acnt.reward_dollar_balance += value_delta;
             if( check_balance )
             {
-               FC_ASSERT( acnt.reward_zbd_balance.amount.value >= 0, "Insufficient reward ZBD funds" );
+               FC_ASSERT( acnt.reward_dollar_balance.amount.value >= 0, "Insufficient reward ZBD funds" );
             }
             break;
          default:
@@ -3606,45 +3606,45 @@ void database::adjust_balance( const account_name_type& name, const asset& delta
    modify_balance( a, delta, true );
 }
 
-void database::adjust_savings_balance( const account_object& a, const asset& delta )
+void database::adjust_savings_liquid_balance( const account_object& a, const asset& delta )
 {
    modify( a, [&]( account_object& acnt )
    {
       switch( delta.symbol.asset_num )
       {
          case ZATTERA_ASSET_NUM_ZTR:
-            acnt.savings_balance += delta;
-            FC_ASSERT( acnt.savings_balance.amount.value >= 0, "Insufficient savings ZTR funds" );
+            acnt.savings_liquid_balance += delta;
+            FC_ASSERT( acnt.savings_liquid_balance.amount.value >= 0, "Insufficient savings ZTR funds" );
             break;
          case ZATTERA_ASSET_NUM_ZBD:
-            if( a.savings_zbd_seconds_last_update != head_block_time() )
+            if( a.savings_dollar_seconds_last_update != head_block_time() )
             {
-               acnt.savings_zbd_seconds += fc::uint128_t(a.savings_zbd_balance.amount.value) * (head_block_time() - a.savings_zbd_seconds_last_update).to_seconds();
-               acnt.savings_zbd_seconds_last_update = head_block_time();
+               acnt.savings_dollar_seconds += fc::uint128_t(a.savings_dollar_balance.amount.value) * (head_block_time() - a.savings_dollar_seconds_last_update).to_seconds();
+               acnt.savings_dollar_seconds_last_update = head_block_time();
 
-               if( acnt.savings_zbd_seconds > 0 &&
-                   (acnt.savings_zbd_seconds_last_update - acnt.savings_zbd_last_interest_payment).to_seconds() > ZATTERA_ZBD_INTEREST_COMPOUND_INTERVAL_SEC )
+               if( acnt.savings_dollar_seconds > 0 &&
+                   (acnt.savings_dollar_seconds_last_update - acnt.savings_dollar_last_interest_payment).to_seconds() > ZATTERA_ZBD_INTEREST_COMPOUND_INTERVAL_SEC )
                {
-                  auto interest = acnt.savings_zbd_seconds / ZATTERA_SECONDS_PER_YEAR;
-                  interest *= get_dynamic_global_properties().zbd_interest_rate;
+                  auto interest = acnt.savings_dollar_seconds / ZATTERA_SECONDS_PER_YEAR;
+                  interest *= get_dynamic_global_properties().dollar_interest_rate;
                   interest /= ZATTERA_100_PERCENT;
                   asset interest_paid(interest.to_uint64(), ZBD_SYMBOL);
-                  acnt.savings_zbd_balance += interest_paid;
-                  acnt.savings_zbd_seconds = 0;
-                  acnt.savings_zbd_last_interest_payment = head_block_time();
+                  acnt.savings_dollar_balance += interest_paid;
+                  acnt.savings_dollar_seconds = 0;
+                  acnt.savings_dollar_last_interest_payment = head_block_time();
 
                   if(interest > 0)
                      push_virtual_operation( interest_operation( a.name, interest_paid ) );
 
                   modify( get_dynamic_global_properties(), [&]( dynamic_global_property_object& props)
                   {
-                     props.current_zbd_supply += interest_paid;
-                     props.virtual_supply += interest_paid * get_feed_history().current_median_history;
+                     props.current_dollar_supply += interest_paid;
+                     props.virtual_liquid_supply += interest_paid * get_feed_history().current_median_history;
                   } );
                }
             }
-            acnt.savings_zbd_balance += delta;
-            FC_ASSERT( acnt.savings_zbd_balance.amount.value >= 0, "Insufficient savings ZBD funds" );
+            acnt.savings_dollar_balance += delta;
+            FC_ASSERT( acnt.savings_dollar_balance.amount.value >= 0, "Insufficient savings ZBD funds" );
             break;
          default:
             FC_ASSERT( !"invalid symbol" );
@@ -3682,16 +3682,16 @@ void database::adjust_supply( const asset& delta, bool adjust_vesting )
          case ZATTERA_ASSET_NUM_ZTR:
          {
             asset new_vesting( (adjust_vesting && delta.amount > 0) ? delta.amount * 9 : 0, ZTR_SYMBOL );
-            props.current_supply += delta + new_vesting;
-            props.virtual_supply += delta + new_vesting;
-            props.total_vesting_fund_ztr += new_vesting;
-            FC_ASSERT( props.current_supply.amount.value >= 0 );
+            props.current_liquid_supply += delta + new_vesting;
+            props.virtual_liquid_supply += delta + new_vesting;
+            props.total_vesting_fund_liquid += new_vesting;
+            FC_ASSERT( props.current_liquid_supply.amount.value >= 0 );
             break;
          }
          case ZATTERA_ASSET_NUM_ZBD:
-            props.current_zbd_supply += delta;
-            props.virtual_supply = props.current_zbd_supply * get_feed_history().current_median_history + props.current_supply;
-            FC_ASSERT( props.current_zbd_supply.amount.value >= 0 );
+            props.current_dollar_supply += delta;
+            props.virtual_liquid_supply = props.current_dollar_supply * get_feed_history().current_median_history + props.current_liquid_supply;
+            FC_ASSERT( props.current_dollar_supply.amount.value >= 0 );
             break;
          default:
             FC_ASSERT( false, "invalid symbol" );
@@ -3705,22 +3705,22 @@ asset database::get_balance( const account_object& a, asset_symbol_type symbol )
    switch( symbol.asset_num )
    {
       case ZATTERA_ASSET_NUM_ZTR:
-         return a.balance;
+         return a.liquid_balance;
       case ZATTERA_ASSET_NUM_ZBD:
-         return a.zbd_balance;
+         return a.dollar_balance;
       default:
          FC_ASSERT( false, "invalid symbol" );
    }
 }
 
-asset database::get_savings_balance( const account_object& a, asset_symbol_type symbol )const
+asset database::get_savings_liquid_balance( const account_object& a, asset_symbol_type symbol )const
 {
    switch( symbol.asset_num )
    {
       case ZATTERA_ASSET_NUM_ZTR:
-         return a.savings_balance;
+         return a.savings_liquid_balance;
       case ZATTERA_ASSET_NUM_ZBD:
-         return a.savings_zbd_balance;
+         return a.savings_dollar_balance;
       default: // Note no savings balance for SMT per comments in issue 1682.
          FC_ASSERT( !"invalid symbol" );
    }
@@ -3814,9 +3814,9 @@ void database::validate_invariants()const
    {
       const auto& account_idx = get_index<account_index>().indices().get<by_name>();
       asset total_supply = asset( 0, ZTR_SYMBOL );
-      asset total_zbd = asset( 0, ZBD_SYMBOL );
+      asset total_dollars = asset( 0, ZBD_SYMBOL );
       asset total_vesting = asset( 0, VESTS_SYMBOL );
-      asset pending_vesting_ztr = asset( 0, ZTR_SYMBOL );
+      asset pending_vesting_liquid = asset( 0, ZTR_SYMBOL );
       share_type total_vsf_votes = share_type( 0 );
 
       auto gpo = get_dynamic_global_properties();
@@ -3828,15 +3828,15 @@ void database::validate_invariants()const
 
       for( auto itr = account_idx.begin(); itr != account_idx.end(); ++itr )
       {
-         total_supply += itr->balance;
-         total_supply += itr->savings_balance;
-         total_supply += itr->reward_ztr_balance;
-         total_zbd += itr->zbd_balance;
-         total_zbd += itr->savings_zbd_balance;
-         total_zbd += itr->reward_zbd_balance;
+         total_supply += itr->liquid_balance;
+         total_supply += itr->savings_liquid_balance;
+         total_supply += itr->reward_liquid_balance;
+         total_dollars += itr->dollar_balance;
+         total_dollars += itr->savings_dollar_balance;
+         total_dollars += itr->reward_dollar_balance;
          total_vesting += itr->vesting_shares;
-         total_vesting += itr->reward_vesting_balance;
-         pending_vesting_ztr += itr->reward_vesting_ztr;
+         total_vesting += itr->reward_vesting_share_balance;
+         pending_vesting_liquid += itr->reward_vesting_liquid_balance;
          total_vsf_votes += ( itr->proxy == ZATTERA_PROXY_TO_SELF_ACCOUNT ?
                                  itr->witness_vote_weight() :
                                  ( ZATTERA_MAX_PROXY_RECURSION_DEPTH > 0 ?
@@ -3851,7 +3851,7 @@ void database::validate_invariants()const
          if( itr->amount.symbol == ZTR_SYMBOL )
             total_supply += itr->amount;
          else if( itr->amount.symbol == ZBD_SYMBOL )
-            total_zbd += itr->amount;
+            total_dollars += itr->amount;
          else
             FC_ASSERT( false, "Encountered illegal symbol in convert_request_object" );
       }
@@ -3866,7 +3866,7 @@ void database::validate_invariants()const
          }
          else if ( itr->sell_price.base.symbol == ZBD_SYMBOL )
          {
-            total_zbd += asset( itr->for_sale, ZBD_SYMBOL );
+            total_dollars += asset( itr->for_sale, ZBD_SYMBOL );
          }
       }
 
@@ -3874,13 +3874,13 @@ void database::validate_invariants()const
 
       for( auto itr = escrow_idx.begin(); itr != escrow_idx.end(); ++itr )
       {
-         total_supply += itr->ztr_balance;
-         total_zbd += itr->zbd_balance;
+         total_supply += itr->liquid_balance;
+         total_dollars += itr->dollar_balance;
 
          if( itr->pending_fee.symbol == ZTR_SYMBOL )
             total_supply += itr->pending_fee;
          else if( itr->pending_fee.symbol == ZBD_SYMBOL )
-            total_zbd += itr->pending_fee;
+            total_dollars += itr->pending_fee;
          else
             FC_ASSERT( false, "found escrow pending fee that is not ZBD or ZTR" );
       }
@@ -3892,7 +3892,7 @@ void database::validate_invariants()const
          if( itr->amount.symbol == ZTR_SYMBOL )
             total_supply += itr->amount;
          else if( itr->amount.symbol == ZBD_SYMBOL )
-            total_zbd += itr->amount;
+            total_dollars += itr->amount;
          else
             FC_ASSERT( false, "found savings withdraw that is not ZBD or ZTR" );
       }
@@ -3904,19 +3904,19 @@ void database::validate_invariants()const
          total_supply += itr->reward_balance;
       }
 
-      total_supply += gpo.total_vesting_fund_ztr + gpo.total_reward_fund_ztr + gpo.pending_rewarded_vesting_ztr;
+      total_supply += gpo.total_vesting_fund_liquid + gpo.total_reward_fund_liquid + gpo.pending_rewarded_vesting_liquid;
 
-      FC_ASSERT( gpo.current_supply == total_supply, "", ("gpo.current_supply",gpo.current_supply)("total_supply",total_supply) );
-      FC_ASSERT( gpo.current_zbd_supply == total_zbd, "", ("gpo.current_zbd_supply",gpo.current_zbd_supply)("total_zbd",total_zbd) );
+      FC_ASSERT( gpo.current_liquid_supply == total_supply, "", ("gpo.current_liquid_supply",gpo.current_liquid_supply)("total_supply",total_supply) );
+      FC_ASSERT( gpo.current_dollar_supply == total_dollars, "", ("gpo.current_dollar_supply",gpo.current_dollar_supply)("total_dollars",total_dollars) );
       FC_ASSERT( gpo.total_vesting_shares + gpo.pending_rewarded_vesting_shares == total_vesting, "", ("gpo.total_vesting_shares",gpo.total_vesting_shares)("total_vesting",total_vesting) );
       FC_ASSERT( gpo.total_vesting_shares.amount == total_vsf_votes, "", ("total_vesting_shares",gpo.total_vesting_shares)("total_vsf_votes",total_vsf_votes) );
-      FC_ASSERT( gpo.pending_rewarded_vesting_ztr == pending_vesting_ztr, "", ("pending_rewarded_vesting_ztr",gpo.pending_rewarded_vesting_ztr)("pending_vesting_ztr", pending_vesting_ztr));
+      FC_ASSERT( gpo.pending_rewarded_vesting_liquid == pending_vesting_liquid, "", ("pending_rewarded_vesting_liquid",gpo.pending_rewarded_vesting_liquid)("pending_vesting_liquid", pending_vesting_liquid));
 
-      FC_ASSERT( gpo.virtual_supply >= gpo.current_supply );
+      FC_ASSERT( gpo.virtual_liquid_supply >= gpo.current_liquid_supply );
       if ( !get_feed_history().current_median_history.is_null() )
       {
-         FC_ASSERT( gpo.current_zbd_supply * get_feed_history().current_median_history + gpo.current_supply
-            == gpo.virtual_supply, "", ("gpo.current_zbd_supply",gpo.current_zbd_supply)("get_feed_history().current_median_history",get_feed_history().current_median_history)("gpo.current_supply",gpo.current_supply)("gpo.virtual_supply",gpo.virtual_supply) );
+         FC_ASSERT( gpo.current_dollar_supply * get_feed_history().current_median_history + gpo.current_liquid_supply
+            == gpo.virtual_liquid_supply, "", ("gpo.current_dollar_supply",gpo.current_dollar_supply)("get_feed_history().current_median_history",get_feed_history().current_median_history)("gpo.current_liquid_supply",gpo.current_liquid_supply)("gpo.virtual_liquid_supply",gpo.virtual_liquid_supply) );
       }
    }
    FC_CAPTURE_LOG_AND_RETHROW( (head_block_num()) );

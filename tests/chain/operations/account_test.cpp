@@ -83,7 +83,7 @@ BOOST_AUTO_TEST_CASE( apply_account_creation )
       private_key_type priv_key = generate_private_key( "alice" );
 
       const account_object& init = db->get_account( ZATTERA_GENESIS_WITNESS_NAME );
-      asset init_starting_balance = init.balance;
+      asset init_starting_balance = init.liquid_balance;
 
       const auto& gpo = db->get_dynamic_global_properties();
 
@@ -108,7 +108,7 @@ BOOST_AUTO_TEST_CASE( apply_account_creation )
       const account_authority_object& acct_auth = db->get< account_authority_object, by_account >( "alice" );
 
       auto vest_shares = gpo.total_vesting_shares;
-      auto vests = gpo.total_vesting_fund_ztr;
+      auto vests = gpo.total_vesting_fund_liquid;
 
       BOOST_REQUIRE( acct.name == "alice" );
       BOOST_REQUIRE( acct_auth.owner == authority( 1, priv_key.get_public_key(), 1 ) );
@@ -116,15 +116,15 @@ BOOST_AUTO_TEST_CASE( apply_account_creation )
       BOOST_REQUIRE( acct.memo_key == priv_key.get_public_key() );
       BOOST_REQUIRE( acct.proxy == "" );
       BOOST_REQUIRE( acct.created == db->head_block_time() );
-      BOOST_REQUIRE( acct.balance.amount.value == ASSET( "0.000 TTR" ).amount.value );
-      BOOST_REQUIRE( acct.zbd_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
+      BOOST_REQUIRE( acct.liquid_balance.amount.value == ASSET( "0.000 TTR" ).amount.value );
+      BOOST_REQUIRE( acct.dollar_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
       BOOST_REQUIRE( acct.id._id == acct_auth.id._id );
 
       /// because init_witness has created vesting shares and blocks have been produced, 100 ZTR is worth less than 100 vesting shares due to rounding
       BOOST_REQUIRE( acct.vesting_shares.amount.value == ( op.fee * ( vest_shares / vests ) ).amount.value );
       BOOST_REQUIRE( acct.vesting_withdraw_rate.amount.value == ASSET( "0.000000 VESTS" ).amount.value );
       BOOST_REQUIRE( acct.proxied_vsf_votes_total().value == 0 );
-      BOOST_REQUIRE( ( init_starting_balance - ASSET( "0.100 TTR" ) ).amount.value == init.balance.amount.value );
+      BOOST_REQUIRE( ( init_starting_balance - ASSET( "0.100 TTR" ) ).amount.value == init.liquid_balance.amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test failure of duplicate account creation" );
@@ -136,18 +136,18 @@ BOOST_AUTO_TEST_CASE( apply_account_creation )
       BOOST_REQUIRE( acct.memo_key == priv_key.get_public_key() );
       BOOST_REQUIRE( acct.proxy == "" );
       BOOST_REQUIRE( acct.created == db->head_block_time() );
-      BOOST_REQUIRE( acct.balance.amount.value == ASSET( "0.000 TTR " ).amount.value );
-      BOOST_REQUIRE( acct.zbd_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
+      BOOST_REQUIRE( acct.liquid_balance.amount.value == ASSET( "0.000 TTR " ).amount.value );
+      BOOST_REQUIRE( acct.dollar_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
       BOOST_REQUIRE( acct.vesting_shares.amount.value == ( op.fee * ( vest_shares / vests ) ).amount.value );
       BOOST_REQUIRE( acct.vesting_withdraw_rate.amount.value == ASSET( "0.000000 VESTS" ).amount.value );
       BOOST_REQUIRE( acct.proxied_vsf_votes_total().value == 0 );
-      BOOST_REQUIRE( ( init_starting_balance - ASSET( "0.100 TTR" ) ).amount.value == init.balance.amount.value );
+      BOOST_REQUIRE( ( init_starting_balance - ASSET( "0.100 TTR" ) ).amount.value == init.liquid_balance.amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test failure when creator cannot cover fee" );
       tx.signatures.clear();
       tx.operations.clear();
-      op.fee = asset( db->get_account( ZATTERA_GENESIS_WITNESS_NAME ).balance.amount + 1, ZTR_SYMBOL );
+      op.fee = asset( db->get_account( ZATTERA_GENESIS_WITNESS_NAME ).liquid_balance.amount + 1, ZTR_SYMBOL );
       op.new_account_name = "bob";
       tx.operations.push_back( op );
       tx.sign( init_account_priv_key, db->get_chain_id() );
@@ -994,51 +994,51 @@ BOOST_AUTO_TEST_CASE( clear_null_account )
       {
          db.modify( db.get_account( ZATTERA_NULL_ACCOUNT ), [&]( account_object& a )
          {
-            a.reward_ztr_balance = ASSET( "1.000 TTR" );
-            a.reward_zbd_balance = ASSET( "1.000 TBD" );
-            a.reward_vesting_balance = ASSET( "1.000000 VESTS" );
-            a.reward_vesting_ztr = ASSET( "1.000 TTR" );
+            a.reward_liquid_balance = ASSET( "1.000 TTR" );
+            a.reward_dollar_balance = ASSET( "1.000 TBD" );
+            a.reward_vesting_share_balance = ASSET( "1.000000 VESTS" );
+            a.reward_vesting_liquid_balance = ASSET( "1.000 TTR" );
          });
 
          db.modify( db.get_dynamic_global_properties(), [&]( dynamic_global_property_object& gpo )
          {
-            gpo.current_supply += ASSET( "2.000 TTR" );
-            gpo.virtual_supply += ASSET( "3.000 TTR" );
-            gpo.current_zbd_supply += ASSET( "1.000 TBD" );
+            gpo.current_liquid_supply += ASSET( "2.000 TTR" );
+            gpo.virtual_liquid_supply += ASSET( "3.000 TTR" );
+            gpo.current_dollar_supply += ASSET( "1.000 TBD" );
             gpo.pending_rewarded_vesting_shares += ASSET( "1.000000 VESTS" );
-            gpo.pending_rewarded_vesting_ztr += ASSET( "1.000 TTR" );
+            gpo.pending_rewarded_vesting_liquid += ASSET( "1.000 TTR" );
          });
       });
 
       validate_database();
 
-      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).balance == ASSET( "1.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).zbd_balance == ASSET( "2.000 TBD" ) );
+      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).liquid_balance == ASSET( "1.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).dollar_balance == ASSET( "2.000 TBD" ) );
       BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).vesting_shares > ASSET( "0.000000 VESTS" ) );
-      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).savings_balance == ASSET( "4.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).savings_zbd_balance == ASSET( "5.000 TBD" ) );
-      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).reward_zbd_balance == ASSET( "1.000 TBD" ) );
-      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).reward_ztr_balance == ASSET( "1.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).reward_vesting_balance == ASSET( "1.000000 VESTS" ) );
-      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).reward_vesting_ztr == ASSET( "1.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( "alice" ).balance == ASSET( "2.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( "alice" ).zbd_balance == ASSET( "3.000 TBD" ) );
+      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).savings_liquid_balance == ASSET( "4.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).savings_dollar_balance == ASSET( "5.000 TBD" ) );
+      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).reward_dollar_balance == ASSET( "1.000 TBD" ) );
+      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).reward_liquid_balance == ASSET( "1.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).reward_vesting_share_balance == ASSET( "1.000000 VESTS" ) );
+      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).reward_vesting_liquid_balance == ASSET( "1.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == ASSET( "2.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).dollar_balance == ASSET( "3.000 TBD" ) );
 
       BOOST_TEST_MESSAGE( "--- Generating block to clear balances" );
       generate_block();
       validate_database();
 
-      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).balance == ASSET( "0.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).zbd_balance == ASSET( "0.000 TBD" ) );
+      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).liquid_balance == ASSET( "0.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).dollar_balance == ASSET( "0.000 TBD" ) );
       BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).vesting_shares == ASSET( "0.000000 VESTS" ) );
-      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).savings_balance == ASSET( "0.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).savings_zbd_balance == ASSET( "0.000 TBD" ) );
-      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).reward_zbd_balance == ASSET( "0.000 TBD" ) );
-      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).reward_ztr_balance == ASSET( "0.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).reward_vesting_balance == ASSET( "0.000000 VESTS" ) );
-      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).reward_vesting_ztr == ASSET( "0.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( "alice" ).balance == ASSET( "2.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( "alice" ).zbd_balance == ASSET( "3.000 TBD" ) );
+      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).savings_liquid_balance == ASSET( "0.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).savings_dollar_balance == ASSET( "0.000 TBD" ) );
+      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).reward_dollar_balance == ASSET( "0.000 TBD" ) );
+      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).reward_liquid_balance == ASSET( "0.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).reward_vesting_share_balance == ASSET( "0.000000 VESTS" ) );
+      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).reward_vesting_liquid_balance == ASSET( "0.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == ASSET( "2.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).dollar_balance == ASSET( "3.000 TBD" ) );
    }
    FC_LOG_AND_RETHROW()
 }
@@ -1565,8 +1565,8 @@ BOOST_AUTO_TEST_CASE( apply_account_claim )
       tx.sign( alice_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
       BOOST_REQUIRE( db->get_account( "alice" ).pending_claimed_accounts == 1 );
-      BOOST_REQUIRE( db->get_account( "alice" ).balance == ASSET( "10.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).balance == ASSET( "5.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == ASSET( "10.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).liquid_balance == ASSET( "5.000 TTR" ) );
       validate_database();
 
 
@@ -1587,7 +1587,7 @@ BOOST_AUTO_TEST_CASE( apply_account_claim )
       tx.sign( alice_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
       BOOST_REQUIRE( db->get_account( "alice" ).pending_claimed_accounts == 2 );
-      BOOST_REQUIRE( db->get_account( "alice" ).balance == ASSET( "5.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == ASSET( "5.000 TTR" ) );
       validate_database();
 
 
@@ -1766,8 +1766,8 @@ BOOST_AUTO_TEST_CASE( apply_claimed_account_creation )
       BOOST_REQUIRE( bob.proxy == "" );
       BOOST_REQUIRE( bob.recovery_account == "alice" );
       BOOST_REQUIRE( bob.created == db->head_block_time() );
-      BOOST_REQUIRE( bob.balance.amount.value == ASSET( "0.000 TTR" ).amount.value );
-      BOOST_REQUIRE( bob.zbd_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
+      BOOST_REQUIRE( bob.liquid_balance.amount.value == ASSET( "0.000 TTR" ).amount.value );
+      BOOST_REQUIRE( bob.dollar_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
       BOOST_REQUIRE( bob.vesting_shares.amount.value == ASSET( "0.000000 VESTS" ).amount.value );
       BOOST_REQUIRE( bob.id._id == bob_auth.id._id );
 

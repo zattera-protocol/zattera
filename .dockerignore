@@ -4,6 +4,9 @@ build/
 # Document directories
 docs/
 
+# Node data directories
+witness_node_data_dir/
+
 # IDE and editor files
 .idea/
 .vscode/

@@ -42,7 +42,7 @@ uint64_t get_rshare_reward( const comment_reward_context& ctx )
    FC_ASSERT( ctx.rshares > 0 );
    FC_ASSERT( ctx.total_reward_shares2 > 0 );
 
-   u256 rf(ctx.total_reward_fund_ztr.amount.value);
+   u256 rf(ctx.total_reward_fund_liquid.amount.value);
    u256 total_claims = to256( ctx.total_reward_shares2 );
 
    //idump( (ctx) );
@@ -54,12 +54,12 @@ uint64_t get_rshare_reward( const comment_reward_context& ctx )
    FC_ASSERT( payout_u256 <= u256( uint64_t( std::numeric_limits<int64_t>::max() ) ) );
    uint64_t payout = static_cast< uint64_t >( payout_u256 );
 
-   if( is_comment_payout_dust( ctx.current_ztr_price, payout ) )
+   if( is_comment_payout_dust( ctx.current_liquid_price, payout ) )
       payout = 0;
 
-   asset max_ztr = to_ztr( ctx.current_ztr_price, ctx.max_zbd );
+   asset max_liquid = to_liquid( ctx.current_liquid_price, ctx.max_dollars );
 
-   payout = std::min( payout, uint64_t( max_ztr.amount.value ) );
+   payout = std::min( payout, uint64_t( max_liquid.amount.value ) );
 
    return payout;
    } FC_CAPTURE_AND_RETHROW( (ctx) )

@@ -38,9 +38,9 @@ DEFINE_API_IMPL( market_history_api_impl, get_ticker )
 
    if( itr != bucket_idx.end() )
    {
-      auto open = ASSET_TO_REAL( asset( itr->non_ztr.open, ZBD_SYMBOL ) ) / ASSET_TO_REAL( asset( itr->ztr.open, ZTR_SYMBOL ) );
+      auto open = ASSET_TO_REAL( asset( itr->dollars.open, ZBD_SYMBOL ) ) / ASSET_TO_REAL( asset( itr->liquid.open, ZTR_SYMBOL ) );
       itr = bucket_idx.lower_bound( boost::make_tuple( 0, _db.head_block_time() ) );
-      result.latest = ASSET_TO_REAL( asset( itr->non_ztr.close, ZBD_SYMBOL ) ) / ASSET_TO_REAL( asset( itr->ztr.close, ZTR_SYMBOL ) );
+      result.latest = ASSET_TO_REAL( asset( itr->dollars.close, ZBD_SYMBOL ) ) / ASSET_TO_REAL( asset( itr->liquid.close, ZTR_SYMBOL ) );
       result.percent_change = ( (result.latest - open ) / open ) * 100;
    }
 
@@ -51,8 +51,8 @@ DEFINE_API_IMPL( market_history_api_impl, get_ticker )
       result.lowest_ask = orders.asks[0].real_price;
 
    auto volume = get_volume( get_volume_args() );
-   result.ztr_volume = volume.ztr_volume;
-   result.zbd_volume = volume.zbd_volume;
+   result.liquid_volume = volume.liquid_volume;
+   result.dollar_volume = volume.dollar_volume;
 
    return result;
 }
@@ -69,8 +69,8 @@ DEFINE_API_IMPL( market_history_api_impl, get_volume )
    uint32_t bucket_size = itr->seconds;
    do
    {
-      result.ztr_volume.amount += itr->ztr.volume;
-      result.zbd_volume.amount += itr->non_ztr.volume;
+      result.liquid_volume.amount += itr->liquid.volume;
+      result.dollar_volume.amount += itr->dollars.volume;
 
       ++itr;
    } while( itr != bucket_idx.end() && itr->seconds == bucket_size );
@@ -92,8 +92,8 @@ DEFINE_API_IMPL( market_history_api_impl, get_order_book )
       order cur;
       cur.order_price = itr->sell_price;
       cur.real_price = ASSET_TO_REAL( itr->sell_price.base ) / ASSET_TO_REAL( itr->sell_price.quote );
-      cur.ztr = ( asset( itr->for_sale, ZBD_SYMBOL ) * itr->sell_price ).amount;
-      cur.zbd = itr->for_sale;
+      cur.liquid = ( asset( itr->for_sale, ZBD_SYMBOL ) * itr->sell_price ).amount;
+      cur.dollars = itr->for_sale;
       cur.created = itr->created;
       result.bids.push_back( cur );
       ++itr;
@@ -106,8 +106,8 @@ DEFINE_API_IMPL( market_history_api_impl, get_order_book )
       order cur;
       cur.order_price = itr->sell_price;
       cur.real_price = ASSET_TO_REAL( itr->sell_price.quote ) / ASSET_TO_REAL( itr->sell_price.base );
-      cur.ztr = itr->for_sale;
-      cur.zbd = ( asset( itr->for_sale, ZTR_SYMBOL ) * itr->sell_price ).amount;
+      cur.liquid = itr->for_sale;
+      cur.dollars = ( asset( itr->for_sale, ZTR_SYMBOL ) * itr->sell_price ).amount;
       cur.created = itr->created;
       result.asks.push_back( cur );
       ++itr;

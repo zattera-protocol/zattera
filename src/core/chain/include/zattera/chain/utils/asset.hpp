@@ -7,20 +7,20 @@ namespace zattera { namespace chain { namespace util {
 using zattera::protocol::asset;
 using zattera::protocol::price;
 
-inline asset to_zbd( const price& p, const asset& ztr )
+inline asset to_dollar( const price& p, const asset& liquid )
 {
-   FC_ASSERT( ztr.symbol == ZTR_SYMBOL );
+   FC_ASSERT( liquid.symbol == ZTR_SYMBOL );
    if( p.is_null() )
       return asset( 0, ZBD_SYMBOL );
-   return ztr * p;
+   return liquid * p;
 }
 
-inline asset to_ztr( const price& p, const asset& zbd )
+inline asset to_liquid( const price& p, const asset& dollar )
 {
-   FC_ASSERT( zbd.symbol == ZBD_SYMBOL );
+   FC_ASSERT( dollar.symbol == ZBD_SYMBOL );
    if( p.is_null() )
       return asset( 0, ZTR_SYMBOL );
-   return zbd * p;
+   return dollar * p;
 }
 
 } } }

@@ -97,11 +97,11 @@ struct bucket_object : public object< bucket_object_type, bucket_object >
    fc::time_point_sec   open;
    uint32_t             seconds = 0;
 
-   bucket_object_details ztr;
-   bucket_object_details non_ztr;
+   bucket_object_details liquid;
+   bucket_object_details dollars;
 
-   price high()const { return asset( non_ztr.high, ZBD_SYMBOL ) / asset( ztr.high, ZTR_SYMBOL ); }
-   price low()const { return asset( non_ztr.low, ZBD_SYMBOL ) / asset( ztr.low, ZTR_SYMBOL ); }
+   price high()const { return asset( dollars.high, ZBD_SYMBOL ) / asset( liquid.high, ZTR_SYMBOL ); }
+   price low()const { return asset( dollars.low, ZBD_SYMBOL ) / asset( liquid.low, ZTR_SYMBOL ); }
 };
 
 typedef oid< bucket_object > bucket_id_type;
@@ -162,7 +162,7 @@ FC_REFLECT( zattera::plugins::market_history::bucket_object_details,
 FC_REFLECT( zattera::plugins::market_history::bucket_object,
                      (id)
                      (open)(seconds)
-                     (ztr)(non_ztr)
+                     (liquid)(dollars)
          )
 
 CHAINBASE_SET_INDEX_TYPE( zattera::plugins::market_history::bucket_object, zattera::plugins::market_history::bucket_index )

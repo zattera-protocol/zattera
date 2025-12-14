@@ -152,8 +152,8 @@ BOOST_AUTO_TEST_CASE( apply_transfer )
       ACTORS( (alice)(bob) )
       fund( "alice", 10000 );
 
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "10.000 TTR" ).amount.value );
-      BOOST_REQUIRE( bob.balance.amount.value == ASSET(" 0.000 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "10.000 TTR" ).amount.value );
+      BOOST_REQUIRE( bob.liquid_balance.amount.value == ASSET(" 0.000 TTR" ).amount.value );
 
       signed_transaction tx;
       transfer_operation op;
@@ -168,8 +168,8 @@ BOOST_AUTO_TEST_CASE( apply_transfer )
       tx.sign( alice_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( alice.balance.amount.value == ASSET( "5.000 TTR" ).amount.value );
-      BOOST_REQUIRE( bob.balance.amount.value == ASSET( "5.000 TTR" ).amount.value );
+      BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "5.000 TTR" ).amount.value );
+      BOOST_REQUIRE( bob.liquid_balance.amount.value == ASSET( "5.000 TTR" ).amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Generating a block" );
@@ -178,8 +178,8 @@ BOOST_AUTO_TEST_CASE( apply_transfer )
       const auto& new_alice = db->get_account( "alice" );
       const auto& new_bob = db->get_account( "bob" );
 
-      BOOST_REQUIRE( new_alice.balance.amount.value == ASSET( "5.000 TTR" ).amount.value );
-      BOOST_REQUIRE( new_bob.balance.amount.value == ASSET( "5.000 TTR" ).amount.value );
+      BOOST_REQUIRE( new_alice.liquid_balance.amount.value == ASSET( "5.000 TTR" ).amount.value );
+      BOOST_REQUIRE( new_bob.liquid_balance.amount.value == ASSET( "5.000 TTR" ).amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test emptying an account" );
@@ -190,8 +190,8 @@ BOOST_AUTO_TEST_CASE( apply_transfer )
       tx.sign( alice_private_key, db->get_chain_id() );
       db->push_transaction( tx, database::skip_transaction_dupe_check );
 
-      BOOST_REQUIRE( new_alice.balance.amount.value == ASSET( "0.000 TTR" ).amount.value );
-      BOOST_REQUIRE( new_bob.balance.amount.value == ASSET( "10.000 TTR" ).amount.value );
+      BOOST_REQUIRE( new_alice.liquid_balance.amount.value == ASSET( "0.000 TTR" ).amount.value );
+      BOOST_REQUIRE( new_bob.liquid_balance.amount.value == ASSET( "10.000 TTR" ).amount.value );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test transferring non-existent funds" );
@@ -202,8 +202,8 @@ BOOST_AUTO_TEST_CASE( apply_transfer )
       tx.sign( alice_private_key, db->get_chain_id() );
       ZATTERA_REQUIRE_THROW( db->push_transaction( tx, database::skip_transaction_dupe_check ), fc::exception );
 
-      BOOST_REQUIRE( new_alice.balance.amount.value == ASSET( "0.000 TTR" ).amount.value );
-      BOOST_REQUIRE( new_bob.balance.amount.value == ASSET( "10.000 TTR" ).amount.value );
+      BOOST_REQUIRE( new_alice.liquid_balance.amount.value == ASSET( "0.000 TTR" ).amount.value );
+      BOOST_REQUIRE( new_bob.liquid_balance.amount.value == ASSET( "10.000 TTR" ).amount.value );
       validate_database();
 
    }
@@ -219,8 +219,8 @@ BOOST_AUTO_TEST_CASE( validate_escrow_transfer )
       escrow_transfer_operation op;
       op.from = "alice";
       op.to = "bob";
-      op.zbd_amount = ASSET( "1.000 TBD" );
-      op.ztr_amount = ASSET( "1.000 TTR" );
+      op.dollar_amount = ASSET( "1.000 TBD" );
+      op.liquid_amount = ASSET( "1.000 TTR" );
       op.escrow_id = 0;
       op.agent = "sam";
       op.fee = ASSET( "0.100 TTR" );
@@ -229,37 +229,37 @@ BOOST_AUTO_TEST_CASE( validate_escrow_transfer )
       op.escrow_expiration = db->head_block_time() + 200;
 
       BOOST_TEST_MESSAGE( "--- failure when zbd symbol != ZBD" );
-      op.zbd_amount.symbol = ZTR_SYMBOL;
+      op.dollar_amount.symbol = ZTR_SYMBOL;
       ZATTERA_REQUIRE_THROW( op.validate(), fc::exception );
 
       BOOST_TEST_MESSAGE( "--- failure when ztr symbol != ZTR" );
-      op.zbd_amount.symbol = ZBD_SYMBOL;
-      op.ztr_amount.symbol = ZBD_SYMBOL;
+      op.dollar_amount.symbol = ZBD_SYMBOL;
+      op.liquid_amount.symbol = ZBD_SYMBOL;
       ZATTERA_REQUIRE_THROW( op.validate(), fc::exception );
 
       BOOST_TEST_MESSAGE( "--- failure when fee symbol != ZBD and fee symbol != ZTR" );
-      op.ztr_amount.symbol = ZTR_SYMBOL;
+      op.liquid_amount.symbol = ZTR_SYMBOL;
       op.fee.symbol = VESTS_SYMBOL;
       ZATTERA_REQUIRE_THROW( op.validate(), fc::exception );
 
       BOOST_TEST_MESSAGE( "--- failure when zbd == 0 and ztr == 0" );
       op.fee.symbol = ZTR_SYMBOL;
-      op.zbd_amount.amount = 0;
-      op.ztr_amount.amount = 0;
+      op.dollar_amount.amount = 0;
+      op.liquid_amount.amount = 0;
       ZATTERA_REQUIRE_THROW( op.validate(), fc::exception );
 
       BOOST_TEST_MESSAGE( "--- failure when zbd < 0" );
-      op.zbd_amount.amount = -100;
-      op.ztr_amount.amount = 1000;
+      op.dollar_amount.amount = -100;
+      op.liquid_amount.amount = 1000;
       ZATTERA_REQUIRE_THROW( op.validate(), fc::exception );
 
       BOOST_TEST_MESSAGE( "--- failure when ztr < 0" );
-      op.zbd_amount.amount = 1000;
-      op.ztr_amount.amount = -100;
+      op.dollar_amount.amount = 1000;
+      op.liquid_amount.amount = -100;
       ZATTERA_REQUIRE_THROW( op.validate(), fc::exception );
 
       BOOST_TEST_MESSAGE( "--- failure when fee < 0" );
-      op.ztr_amount.amount = 1000;
+      op.liquid_amount.amount = 1000;
       op.fee.amount = -100;
       ZATTERA_REQUIRE_THROW( op.validate(), fc::exception );
 
@@ -288,8 +288,8 @@ BOOST_AUTO_TEST_CASE( check_escrow_transfer_authorities )
       escrow_transfer_operation op;
       op.from = "alice";
       op.to = "bob";
-      op.zbd_amount = ASSET( "1.000 TBD" );
-      op.ztr_amount = ASSET( "1.000 TTR" );
+      op.dollar_amount = ASSET( "1.000 TBD" );
+      op.liquid_amount = ASSET( "1.000 TTR" );
       op.escrow_id = 0;
       op.agent = "sam";
       op.fee = ASSET( "0.100 TTR" );
@@ -326,8 +326,8 @@ BOOST_AUTO_TEST_CASE( apply_escrow_transfer )
       escrow_transfer_operation op;
       op.from = "alice";
       op.to = "bob";
-      op.zbd_amount = ASSET( "1.000 TBD" );
-      op.ztr_amount = ASSET( "1.000 TTR" );
+      op.dollar_amount = ASSET( "1.000 TBD" );
+      op.liquid_amount = ASSET( "1.000 TTR" );
       op.escrow_id = 0;
       op.agent = "sam";
       op.fee = ASSET( "0.100 TTR" );
@@ -343,8 +343,8 @@ BOOST_AUTO_TEST_CASE( apply_escrow_transfer )
       ZATTERA_REQUIRE_THROW( db->push_transaction( tx, 0 ), fc::exception );
 
       BOOST_TEST_MESSAGE( "--- falure when from cannot cover amount + fee" );
-      op.zbd_amount.amount = 0;
-      op.ztr_amount.amount = 10000;
+      op.dollar_amount.amount = 0;
+      op.liquid_amount.amount = 10000;
       tx.operations.clear();
       tx.signatures.clear();
       tx.operations.push_back( op );
@@ -352,7 +352,7 @@ BOOST_AUTO_TEST_CASE( apply_escrow_transfer )
       ZATTERA_REQUIRE_THROW( db->push_transaction( tx, 0 ), fc::exception );
 
       BOOST_TEST_MESSAGE( "--- failure when ratification deadline is in the past" );
-      op.ztr_amount.amount = 1000;
+      op.liquid_amount.amount = 1000;
       op.ratification_deadline = db->head_block_time() - 200;
       tx.operations.clear();
       tx.signatures.clear();
@@ -376,12 +376,12 @@ BOOST_AUTO_TEST_CASE( apply_escrow_transfer )
       tx.operations.push_back( op );
       tx.sign( alice_private_key, db->get_chain_id() );
 
-      auto alice_ztr_balance = alice.balance - op.ztr_amount - op.fee;
-      auto alice_zbd_balance = alice.zbd_balance - op.zbd_amount;
-      auto bob_ztr_balance = bob.balance;
-      auto bob_zbd_balance = bob.zbd_balance;
-      auto sam_ztr_balance = sam.balance;
-      auto sam_zbd_balance = sam.zbd_balance;
+      auto alice_liquid_balance = alice.liquid_balance - op.liquid_amount - op.fee;
+      auto alice_dollar_balance = alice.dollar_balance - op.dollar_amount;
+      auto bob_liquid_balance = bob.liquid_balance;
+      auto bob_dollar_balance = bob.dollar_balance;
+      auto sam_liquid_balance = sam.liquid_balance;
+      auto sam_dollar_balance = sam.dollar_balance;
 
       db->push_transaction( tx, 0 );
 
@@ -393,18 +393,18 @@ BOOST_AUTO_TEST_CASE( apply_escrow_transfer )
       BOOST_REQUIRE( escrow.agent == op.agent );
       BOOST_REQUIRE( escrow.ratification_deadline == op.ratification_deadline );
       BOOST_REQUIRE( escrow.escrow_expiration == op.escrow_expiration );
-      BOOST_REQUIRE( escrow.zbd_balance == op.zbd_amount );
-      BOOST_REQUIRE( escrow.ztr_balance == op.ztr_amount );
+      BOOST_REQUIRE( escrow.dollar_balance == op.dollar_amount );
+      BOOST_REQUIRE( escrow.liquid_balance == op.liquid_amount );
       BOOST_REQUIRE( escrow.pending_fee == op.fee );
       BOOST_REQUIRE( !escrow.to_approved );
       BOOST_REQUIRE( !escrow.agent_approved );
       BOOST_REQUIRE( !escrow.disputed );
-      BOOST_REQUIRE( alice.balance == alice_ztr_balance );
-      BOOST_REQUIRE( alice.zbd_balance == alice_zbd_balance );
-      BOOST_REQUIRE( bob.balance == bob_ztr_balance );
-      BOOST_REQUIRE( bob.zbd_balance == bob_zbd_balance );
-      BOOST_REQUIRE( sam.balance == sam_ztr_balance );
-      BOOST_REQUIRE( sam.zbd_balance == sam_zbd_balance );
+      BOOST_REQUIRE( alice.liquid_balance == alice_liquid_balance );
+      BOOST_REQUIRE( alice.dollar_balance == alice_dollar_balance );
+      BOOST_REQUIRE( bob.liquid_balance == bob_liquid_balance );
+      BOOST_REQUIRE( bob.dollar_balance == bob_dollar_balance );
+      BOOST_REQUIRE( sam.liquid_balance == sam_liquid_balance );
+      BOOST_REQUIRE( sam.dollar_balance == sam_dollar_balance );
 
       validate_database();
    }
@@ -492,7 +492,7 @@ BOOST_AUTO_TEST_CASE( apply_escrow_approve )
       et_op.from = "alice";
       et_op.to = "bob";
       et_op.agent = "sam";
-      et_op.ztr_amount = ASSET( "1.000 TTR" );
+      et_op.liquid_amount = ASSET( "1.000 TTR" );
       et_op.fee = ASSET( "0.100 TTR" );
       et_op.json_meta = "";
       et_op.ratification_deadline = db->head_block_time() + 100;
@@ -548,8 +548,8 @@ BOOST_AUTO_TEST_CASE( apply_escrow_approve )
       BOOST_REQUIRE( escrow.agent == "sam" );
       BOOST_REQUIRE( escrow.ratification_deadline == et_op.ratification_deadline );
       BOOST_REQUIRE( escrow.escrow_expiration == et_op.escrow_expiration );
-      BOOST_REQUIRE( escrow.zbd_balance == ASSET( "0.000 TBD" ) );
-      BOOST_REQUIRE( escrow.ztr_balance == ASSET( "1.000 TTR" ) );
+      BOOST_REQUIRE( escrow.dollar_balance == ASSET( "0.000 TBD" ) );
+      BOOST_REQUIRE( escrow.liquid_balance == ASSET( "1.000 TTR" ) );
       BOOST_REQUIRE( escrow.pending_fee == ASSET( "0.100 TTR" ) );
       BOOST_REQUIRE( escrow.to_approved );
       BOOST_REQUIRE( !escrow.agent_approved );
@@ -567,8 +567,8 @@ BOOST_AUTO_TEST_CASE( apply_escrow_approve )
       BOOST_REQUIRE( escrow.agent == "sam" );
       BOOST_REQUIRE( escrow.ratification_deadline == et_op.ratification_deadline );
       BOOST_REQUIRE( escrow.escrow_expiration == et_op.escrow_expiration );
-      BOOST_REQUIRE( escrow.zbd_balance == ASSET( "0.000 TBD" ) );
-      BOOST_REQUIRE( escrow.ztr_balance == ASSET( "1.000 TTR" ) );
+      BOOST_REQUIRE( escrow.dollar_balance == ASSET( "0.000 TBD" ) );
+      BOOST_REQUIRE( escrow.liquid_balance == ASSET( "1.000 TTR" ) );
       BOOST_REQUIRE( escrow.pending_fee == ASSET( "0.100 TTR" ) );
       BOOST_REQUIRE( escrow.to_approved );
       BOOST_REQUIRE( !escrow.agent_approved );
@@ -589,8 +589,8 @@ BOOST_AUTO_TEST_CASE( apply_escrow_approve )
       BOOST_REQUIRE( escrow.agent == "sam" );
       BOOST_REQUIRE( escrow.ratification_deadline == et_op.ratification_deadline );
       BOOST_REQUIRE( escrow.escrow_expiration == et_op.escrow_expiration );
-      BOOST_REQUIRE( escrow.zbd_balance == ASSET( "0.000 TBD" ) );
-      BOOST_REQUIRE( escrow.ztr_balance == ASSET( "1.000 TTR" ) );
+      BOOST_REQUIRE( escrow.dollar_balance == ASSET( "0.000 TBD" ) );
+      BOOST_REQUIRE( escrow.liquid_balance == ASSET( "1.000 TTR" ) );
       BOOST_REQUIRE( escrow.pending_fee == ASSET( "0.100 TTR" ) );
       BOOST_REQUIRE( escrow.to_approved );
       BOOST_REQUIRE( !escrow.agent_approved );
@@ -608,7 +608,7 @@ BOOST_AUTO_TEST_CASE( apply_escrow_approve )
       db->push_transaction( tx, 0 );
 
       ZATTERA_REQUIRE_THROW( db->get_escrow( op.from, op.escrow_id ), fc::exception );
-      BOOST_REQUIRE( alice.balance == ASSET( "10.000 TTR" ) );
+      BOOST_REQUIRE( alice.liquid_balance == ASSET( "10.000 TTR" ) );
       validate_database();
 
 
@@ -622,7 +622,7 @@ BOOST_AUTO_TEST_CASE( apply_escrow_approve )
       generate_blocks( et_op.ratification_deadline + ZATTERA_BLOCK_INTERVAL, true );
 
       ZATTERA_REQUIRE_THROW( db->get_escrow( op.from, op.escrow_id ), fc::exception );
-      BOOST_REQUIRE( db->get_account( "alice" ).balance == ASSET( "10.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == ASSET( "10.000 TTR" ) );
       validate_database();
 
 
@@ -647,7 +647,7 @@ BOOST_AUTO_TEST_CASE( apply_escrow_approve )
       generate_blocks( et_op.ratification_deadline + ZATTERA_BLOCK_INTERVAL, true );
 
       ZATTERA_REQUIRE_THROW( db->get_escrow( op.from, op.escrow_id ), fc::exception );
-      BOOST_REQUIRE( db->get_account( "alice" ).balance == ASSET( "10.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == ASSET( "10.000 TTR" ) );
       validate_database();
 
 
@@ -671,7 +671,7 @@ BOOST_AUTO_TEST_CASE( apply_escrow_approve )
       generate_blocks( et_op.ratification_deadline + ZATTERA_BLOCK_INTERVAL, true );
 
       ZATTERA_REQUIRE_THROW( db->get_escrow( op.from, op.escrow_id ), fc::exception );
-      BOOST_REQUIRE( db->get_account( "alice" ).balance == ASSET( "10.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == ASSET( "10.000 TTR" ) );
       validate_database();
 
 
@@ -705,15 +705,15 @@ BOOST_AUTO_TEST_CASE( apply_escrow_approve )
          BOOST_REQUIRE( escrow.agent == "sam" );
          BOOST_REQUIRE( escrow.ratification_deadline == et_op.ratification_deadline );
          BOOST_REQUIRE( escrow.escrow_expiration == et_op.escrow_expiration );
-         BOOST_REQUIRE( escrow.zbd_balance == ASSET( "0.000 TBD" ) );
-         BOOST_REQUIRE( escrow.ztr_balance == ASSET( "1.000 TTR" ) );
+         BOOST_REQUIRE( escrow.dollar_balance == ASSET( "0.000 TBD" ) );
+         BOOST_REQUIRE( escrow.liquid_balance == ASSET( "1.000 TTR" ) );
          BOOST_REQUIRE( escrow.pending_fee == ASSET( "0.000 TTR" ) );
          BOOST_REQUIRE( escrow.to_approved );
          BOOST_REQUIRE( escrow.agent_approved );
          BOOST_REQUIRE( !escrow.disputed );
       }
 
-      BOOST_REQUIRE( db->get_account( "sam" ).balance == et_op.fee );
+      BOOST_REQUIRE( db->get_account( "sam" ).liquid_balance == et_op.fee );
       validate_database();
 
 
@@ -726,15 +726,15 @@ BOOST_AUTO_TEST_CASE( apply_escrow_approve )
          BOOST_REQUIRE( escrow.agent == "sam" );
          BOOST_REQUIRE( escrow.ratification_deadline == et_op.ratification_deadline );
          BOOST_REQUIRE( escrow.escrow_expiration == et_op.escrow_expiration );
-         BOOST_REQUIRE( escrow.zbd_balance == ASSET( "0.000 TBD" ) );
-         BOOST_REQUIRE( escrow.ztr_balance == ASSET( "1.000 TTR" ) );
+         BOOST_REQUIRE( escrow.dollar_balance == ASSET( "0.000 TBD" ) );
+         BOOST_REQUIRE( escrow.liquid_balance == ASSET( "1.000 TTR" ) );
          BOOST_REQUIRE( escrow.pending_fee == ASSET( "0.000 TTR" ) );
          BOOST_REQUIRE( escrow.to_approved );
          BOOST_REQUIRE( escrow.agent_approved );
          BOOST_REQUIRE( !escrow.disputed );
       }
 
-      BOOST_REQUIRE( db->get_account( "sam" ).balance == et_op.fee );
+      BOOST_REQUIRE( db->get_account( "sam" ).liquid_balance == et_op.fee );
       validate_database();
    }
    FC_LOG_AND_RETHROW()
@@ -811,7 +811,7 @@ BOOST_AUTO_TEST_CASE( apply_escrow_dispute )
       et_op.from = "alice";
       et_op.to = "bob";
       et_op.agent = "sam";
-      et_op.ztr_amount = ASSET( "1.000 TTR" );
+      et_op.liquid_amount = ASSET( "1.000 TTR" );
       et_op.fee = ASSET( "0.100 TTR" );
       et_op.ratification_deadline = db->head_block_time() + ZATTERA_BLOCK_INTERVAL;
       et_op.escrow_expiration = db->head_block_time() + 2 * ZATTERA_BLOCK_INTERVAL;
@@ -850,8 +850,8 @@ BOOST_AUTO_TEST_CASE( apply_escrow_dispute )
       BOOST_REQUIRE( escrow.agent == "sam" );
       BOOST_REQUIRE( escrow.ratification_deadline == et_op.ratification_deadline );
       BOOST_REQUIRE( escrow.escrow_expiration == et_op.escrow_expiration );
-      BOOST_REQUIRE( escrow.zbd_balance == et_op.zbd_amount );
-      BOOST_REQUIRE( escrow.ztr_balance == et_op.ztr_amount );
+      BOOST_REQUIRE( escrow.dollar_balance == et_op.dollar_amount );
+      BOOST_REQUIRE( escrow.liquid_balance == et_op.liquid_amount );
       BOOST_REQUIRE( escrow.pending_fee == et_op.fee );
       BOOST_REQUIRE( escrow.to_approved );
       BOOST_REQUIRE( !escrow.agent_approved );
@@ -884,8 +884,8 @@ BOOST_AUTO_TEST_CASE( apply_escrow_dispute )
       BOOST_REQUIRE( escrow.agent == "sam" );
       BOOST_REQUIRE( escrow.ratification_deadline == et_op.ratification_deadline );
       BOOST_REQUIRE( escrow.escrow_expiration == et_op.escrow_expiration );
-      BOOST_REQUIRE( escrow.zbd_balance == et_op.zbd_amount );
-      BOOST_REQUIRE( escrow.ztr_balance == et_op.ztr_amount );
+      BOOST_REQUIRE( escrow.dollar_balance == et_op.dollar_amount );
+      BOOST_REQUIRE( escrow.liquid_balance == et_op.liquid_amount );
       BOOST_REQUIRE( escrow.pending_fee == ASSET( "0.000 TTR" ) );
       BOOST_REQUIRE( escrow.to_approved );
       BOOST_REQUIRE( escrow.agent_approved );
@@ -906,8 +906,8 @@ BOOST_AUTO_TEST_CASE( apply_escrow_dispute )
       BOOST_REQUIRE( escrow.agent == "sam" );
       BOOST_REQUIRE( escrow.ratification_deadline == et_op.ratification_deadline );
       BOOST_REQUIRE( escrow.escrow_expiration == et_op.escrow_expiration );
-      BOOST_REQUIRE( escrow.zbd_balance == et_op.zbd_amount );
-      BOOST_REQUIRE( escrow.ztr_balance == et_op.ztr_amount );
+      BOOST_REQUIRE( escrow.dollar_balance == et_op.dollar_amount );
+      BOOST_REQUIRE( escrow.liquid_balance == et_op.liquid_amount );
       BOOST_REQUIRE( escrow.pending_fee == ASSET( "0.000 TTR" ) );
       BOOST_REQUIRE( escrow.to_approved );
       BOOST_REQUIRE( escrow.agent_approved );
@@ -931,8 +931,8 @@ BOOST_AUTO_TEST_CASE( apply_escrow_dispute )
          BOOST_REQUIRE( escrow.agent == "sam" );
          BOOST_REQUIRE( escrow.ratification_deadline == et_op.ratification_deadline );
          BOOST_REQUIRE( escrow.escrow_expiration == et_op.escrow_expiration );
-         BOOST_REQUIRE( escrow.zbd_balance == et_op.zbd_amount );
-         BOOST_REQUIRE( escrow.ztr_balance == et_op.ztr_amount );
+         BOOST_REQUIRE( escrow.dollar_balance == et_op.dollar_amount );
+         BOOST_REQUIRE( escrow.liquid_balance == et_op.liquid_amount );
          BOOST_REQUIRE( escrow.pending_fee == ASSET( "0.000 TTR" ) );
          BOOST_REQUIRE( escrow.to_approved );
          BOOST_REQUIRE( escrow.agent_approved );
@@ -970,8 +970,8 @@ BOOST_AUTO_TEST_CASE( apply_escrow_dispute )
          BOOST_REQUIRE( escrow.agent == "sam" );
          BOOST_REQUIRE( escrow.ratification_deadline == et_op.ratification_deadline );
          BOOST_REQUIRE( escrow.escrow_expiration == et_op.escrow_expiration );
-         BOOST_REQUIRE( escrow.zbd_balance == et_op.zbd_amount );
-         BOOST_REQUIRE( escrow.ztr_balance == et_op.ztr_amount );
+         BOOST_REQUIRE( escrow.dollar_balance == et_op.dollar_amount );
+         BOOST_REQUIRE( escrow.liquid_balance == et_op.liquid_amount );
          BOOST_REQUIRE( escrow.pending_fee == ASSET( "0.000 TTR" ) );
          BOOST_REQUIRE( escrow.to_approved );
          BOOST_REQUIRE( escrow.agent_approved );
@@ -993,8 +993,8 @@ BOOST_AUTO_TEST_CASE( apply_escrow_dispute )
          BOOST_REQUIRE( escrow.agent == "sam" );
          BOOST_REQUIRE( escrow.ratification_deadline == et_op.ratification_deadline );
          BOOST_REQUIRE( escrow.escrow_expiration == et_op.escrow_expiration );
-         BOOST_REQUIRE( escrow.zbd_balance == et_op.zbd_amount );
-         BOOST_REQUIRE( escrow.ztr_balance == et_op.ztr_amount );
+         BOOST_REQUIRE( escrow.dollar_balance == et_op.dollar_amount );
+         BOOST_REQUIRE( escrow.liquid_balance == et_op.liquid_amount );
          BOOST_REQUIRE( escrow.pending_fee == ASSET( "0.000 TTR" ) );
          BOOST_REQUIRE( escrow.to_approved );
          BOOST_REQUIRE( escrow.agent_approved );
@@ -1018,34 +1018,34 @@ BOOST_AUTO_TEST_CASE( validate_escrow_release )
 
 
       BOOST_TEST_MESSAGE( "--- failure when ztr < 0" );
-      op.ztr_amount.amount = -1;
+      op.liquid_amount.amount = -1;
       ZATTERA_REQUIRE_THROW( op.validate(), fc::exception );
 
 
       BOOST_TEST_MESSAGE( "--- failure when zbd < 0" );
-      op.ztr_amount.amount = 0;
-      op.zbd_amount.amount = -1;
+      op.liquid_amount.amount = 0;
+      op.dollar_amount.amount = -1;
       ZATTERA_REQUIRE_THROW( op.validate(), fc::exception );
 
 
       BOOST_TEST_MESSAGE( "--- failure when ztr == 0 and zbd == 0" );
-      op.zbd_amount.amount = 0;
+      op.dollar_amount.amount = 0;
       ZATTERA_REQUIRE_THROW( op.validate(), fc::exception );
 
 
       BOOST_TEST_MESSAGE( "--- failure when zbd is not zbd symbol" );
-      op.zbd_amount = ASSET( "1.000 TTR" );
+      op.dollar_amount = ASSET( "1.000 TTR" );
       ZATTERA_REQUIRE_THROW( op.validate(), fc::exception );
 
 
       BOOST_TEST_MESSAGE( "--- failure when ztr is not ztr symbol" );
-      op.zbd_amount.symbol = ZBD_SYMBOL;
-      op.ztr_amount = ASSET( "1.000 TBD" );
+      op.dollar_amount.symbol = ZBD_SYMBOL;
+      op.liquid_amount = ASSET( "1.000 TBD" );
       ZATTERA_REQUIRE_THROW( op.validate(), fc::exception );
 
 
       BOOST_TEST_MESSAGE( "--- success" );
-      op.ztr_amount.symbol = ZTR_SYMBOL;
+      op.liquid_amount.symbol = ZTR_SYMBOL;
       op.validate();
    }
    FC_LOG_AND_RETHROW()
@@ -1104,7 +1104,7 @@ BOOST_AUTO_TEST_CASE( apply_escrow_release )
       et_op.from = "alice";
       et_op.to = "bob";
       et_op.agent = "sam";
-      et_op.ztr_amount = ASSET( "1.000 TTR" );
+      et_op.liquid_amount = ASSET( "1.000 TTR" );
       et_op.fee = ASSET( "0.100 TTR" );
       et_op.ratification_deadline = db->head_block_time() + ZATTERA_BLOCK_INTERVAL;
       et_op.escrow_expiration = db->head_block_time() + 2 * ZATTERA_BLOCK_INTERVAL;
@@ -1124,7 +1124,7 @@ BOOST_AUTO_TEST_CASE( apply_escrow_release )
       op.agent = et_op.agent;
       op.who = et_op.from;
       op.receiver = et_op.to;
-      op.ztr_amount = ASSET( "0.100 TTR" );
+      op.liquid_amount = ASSET( "0.100 TTR" );
 
       tx.clear();
       tx.operations.push_back( op );
@@ -1240,8 +1240,8 @@ BOOST_AUTO_TEST_CASE( apply_escrow_release )
       tx.sign( bob_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_escrow( op.from, op.escrow_id ).ztr_balance == ASSET( "0.900 TTR" ) );
-      BOOST_REQUIRE( db->get_account( "alice" ).balance == ASSET( "9.000 TTR" ) );
+      BOOST_REQUIRE( db->get_escrow( op.from, op.escrow_id ).liquid_balance == ASSET( "0.900 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == ASSET( "9.000 TTR" ) );
 
 
       BOOST_TEST_MESSAGE( "--- failure when 'from' attempts to release non-disputed escrow to 'from'" );
@@ -1280,12 +1280,12 @@ BOOST_AUTO_TEST_CASE( apply_escrow_release )
       tx.sign( alice_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_escrow( op.from, op.escrow_id ).ztr_balance == ASSET( "0.800 TTR" ) );
-      BOOST_REQUIRE( db->get_account( "bob" ).balance == ASSET( "0.100 TTR" ) );
+      BOOST_REQUIRE( db->get_escrow( op.from, op.escrow_id ).liquid_balance == ASSET( "0.800 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "bob" ).liquid_balance == ASSET( "0.100 TTR" ) );
 
 
       BOOST_TEST_MESSAGE( "--- failure when releasing more zbd than available" );
-      op.ztr_amount = ASSET( "1.000 TTR" );
+      op.liquid_amount = ASSET( "1.000 TTR" );
 
       tx.clear();
       tx.operations.push_back( op );
@@ -1294,8 +1294,8 @@ BOOST_AUTO_TEST_CASE( apply_escrow_release )
 
 
       BOOST_TEST_MESSAGE( "--- failure when releasing less ztr than available" );
-      op.ztr_amount = ASSET( "0.000 TTR" );
-      op.zbd_amount = ASSET( "1.000 TBD" );
+      op.liquid_amount = ASSET( "0.000 TTR" );
+      op.dollar_amount = ASSET( "1.000 TBD" );
 
       tx.clear();
       tx.operations.push_back( op );
@@ -1319,8 +1319,8 @@ BOOST_AUTO_TEST_CASE( apply_escrow_release )
       op.from = et_op.from;
       op.receiver = et_op.from;
       op.who = et_op.to;
-      op.ztr_amount = ASSET( "0.100 TTR" );
-      op.zbd_amount = ASSET( "0.000 TBD" );
+      op.liquid_amount = ASSET( "0.100 TTR" );
+      op.dollar_amount = ASSET( "0.000 TBD" );
       tx.operations.push_back( op );
       tx.sign( bob_private_key, db->get_chain_id() );
       ZATTERA_REQUIRE_THROW( db->push_transaction( tx, 0 ), fc::exception );
@@ -1361,8 +1361,8 @@ BOOST_AUTO_TEST_CASE( apply_escrow_release )
       tx.sign( sam_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_account( "bob" ).balance == ASSET( "0.200 TTR" ) );
-      BOOST_REQUIRE( db->get_escrow( et_op.from, et_op.escrow_id ).ztr_balance == ASSET( "0.700 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "bob" ).liquid_balance == ASSET( "0.200 TTR" ) );
+      BOOST_REQUIRE( db->get_escrow( et_op.from, et_op.escrow_id ).liquid_balance == ASSET( "0.700 TTR" ) );
 
 
       BOOST_TEST_MESSAGE( "--- success releasing disputed escrow with agent to 'from'" );
@@ -1373,8 +1373,8 @@ BOOST_AUTO_TEST_CASE( apply_escrow_release )
       tx.sign( sam_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_account( "alice" ).balance == ASSET( "9.100 TTR" ) );
-      BOOST_REQUIRE( db->get_escrow( et_op.from, et_op.escrow_id ).ztr_balance == ASSET( "0.600 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == ASSET( "9.100 TTR" ) );
+      BOOST_REQUIRE( db->get_escrow( et_op.from, et_op.escrow_id ).liquid_balance == ASSET( "0.600 TTR" ) );
 
 
       BOOST_TEST_MESSAGE( "--- failure when 'to' attempts to release disputed expired escrow" );
@@ -1406,18 +1406,18 @@ BOOST_AUTO_TEST_CASE( apply_escrow_release )
       tx.sign( sam_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_account( "alice" ).balance == ASSET( "9.200 TTR" ) );
-      BOOST_REQUIRE( db->get_escrow( et_op.from, et_op.escrow_id ).ztr_balance == ASSET( "0.500 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == ASSET( "9.200 TTR" ) );
+      BOOST_REQUIRE( db->get_escrow( et_op.from, et_op.escrow_id ).liquid_balance == ASSET( "0.500 TTR" ) );
 
 
       BOOST_TEST_MESSAGE( "--- success deleting escrow when balances are both zero" );
       tx.clear();
-      op.ztr_amount = ASSET( "0.500 TTR" );
+      op.liquid_amount = ASSET( "0.500 TTR" );
       tx.operations.push_back( op );
       tx.sign( sam_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_account( "alice" ).balance == ASSET( "9.700 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == ASSET( "9.700 TTR" ) );
       ZATTERA_REQUIRE_THROW( db->get_escrow( et_op.from, et_op.escrow_id ), fc::exception );
 
 
@@ -1439,7 +1439,7 @@ BOOST_AUTO_TEST_CASE( apply_escrow_release )
       tx.clear();
       op.receiver = et_op.to;
       op.who = et_op.agent;
-      op.ztr_amount = ASSET( "0.100 TTR" );
+      op.liquid_amount = ASSET( "0.100 TTR" );
       tx.operations.push_back( op );
       tx.sign( sam_private_key, db->get_chain_id() );
       ZATTERA_REQUIRE_THROW( db->push_transaction( tx, 0 ), fc::exception );
@@ -1485,8 +1485,8 @@ BOOST_AUTO_TEST_CASE( apply_escrow_release )
       tx.sign( bob_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_account( "bob" ).balance == ASSET( "0.300 TTR" ) );
-      BOOST_REQUIRE( db->get_escrow( et_op.from, et_op.escrow_id ).ztr_balance == ASSET( "0.900 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "bob" ).liquid_balance == ASSET( "0.300 TTR" ) );
+      BOOST_REQUIRE( db->get_escrow( et_op.from, et_op.escrow_id ).liquid_balance == ASSET( "0.900 TTR" ) );
 
 
       BOOST_TEST_MESSAGE( "--- success release non-disputed expired escrow to 'from' from 'to'" );
@@ -1496,8 +1496,8 @@ BOOST_AUTO_TEST_CASE( apply_escrow_release )
       tx.sign( bob_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_account( "alice" ).balance == ASSET( "8.700 TTR" ) );
-      BOOST_REQUIRE( db->get_escrow( et_op.from, et_op.escrow_id ).ztr_balance == ASSET( "0.800 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == ASSET( "8.700 TTR" ) );
+      BOOST_REQUIRE( db->get_escrow( et_op.from, et_op.escrow_id ).liquid_balance == ASSET( "0.800 TTR" ) );
 
 
       BOOST_TEST_MESSAGE( "--- failure when 'from' attempts to release non-disputed expired escrow to 'agent'" );
@@ -1524,8 +1524,8 @@ BOOST_AUTO_TEST_CASE( apply_escrow_release )
       tx.sign( alice_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_account( "bob" ).balance == ASSET( "0.400 TTR" ) );
-      BOOST_REQUIRE( db->get_escrow( et_op.from, et_op.escrow_id ).ztr_balance == ASSET( "0.700 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "bob" ).liquid_balance == ASSET( "0.400 TTR" ) );
+      BOOST_REQUIRE( db->get_escrow( et_op.from, et_op.escrow_id ).liquid_balance == ASSET( "0.700 TTR" ) );
 
 
       BOOST_TEST_MESSAGE( "--- success release non-disputed expired escrow to 'from' from 'from'" );
@@ -1535,18 +1535,18 @@ BOOST_AUTO_TEST_CASE( apply_escrow_release )
       tx.sign( alice_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_account( "alice" ).balance == ASSET( "8.800 TTR" ) );
-      BOOST_REQUIRE( db->get_escrow( et_op.from, et_op.escrow_id ).ztr_balance == ASSET( "0.600 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == ASSET( "8.800 TTR" ) );
+      BOOST_REQUIRE( db->get_escrow( et_op.from, et_op.escrow_id ).liquid_balance == ASSET( "0.600 TTR" ) );
 
 
       BOOST_TEST_MESSAGE( "--- success deleting escrow when balances are zero on non-disputed escrow" );
       tx.clear();
-      op.ztr_amount = ASSET( "0.600 TTR" );
+      op.liquid_amount = ASSET( "0.600 TTR" );
       tx.operations.push_back( op );
       tx.sign( alice_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_account( "alice" ).balance == ASSET( "9.400 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == ASSET( "9.400 TTR" ) );
       ZATTERA_REQUIRE_THROW( db->get_escrow( et_op.from, et_op.escrow_id ), fc::exception );
    }
    FC_LOG_AND_RETHROW()
@@ -1644,8 +1644,8 @@ BOOST_AUTO_TEST_CASE( apply_transfer_to_savings )
       fund( "alice", ASSET( "10.000 TTR" ) );
       fund( "alice", ASSET( "10.000 TBD" ) );
 
-      BOOST_REQUIRE( db->get_account( "alice" ).balance == ASSET( "10.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( "alice" ).zbd_balance == ASSET( "10.000 TBD" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == ASSET( "10.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).dollar_balance == ASSET( "10.000 TBD" ) );
 
       transfer_to_savings_operation op;
       signed_transaction tx;
@@ -1681,8 +1681,8 @@ BOOST_AUTO_TEST_CASE( apply_transfer_to_savings )
       tx.sign( alice_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_account( "alice" ).balance == ASSET( "9.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( "alice" ).savings_balance == ASSET( "1.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == ASSET( "9.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).savings_liquid_balance == ASSET( "1.000 TTR" ) );
       validate_database();
 
 
@@ -1694,8 +1694,8 @@ BOOST_AUTO_TEST_CASE( apply_transfer_to_savings )
       tx.sign( alice_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_account( "alice" ).zbd_balance == ASSET( "9.000 TBD" ) );
-      BOOST_REQUIRE( db->get_account( "alice" ).savings_zbd_balance == ASSET( "1.000 TBD" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).dollar_balance == ASSET( "9.000 TBD" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).savings_dollar_balance == ASSET( "1.000 TBD" ) );
       validate_database();
 
 
@@ -1708,8 +1708,8 @@ BOOST_AUTO_TEST_CASE( apply_transfer_to_savings )
       tx.sign( alice_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_account( "alice" ).balance == ASSET( "8.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( "bob" ).savings_balance == ASSET( "1.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == ASSET( "8.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "bob" ).savings_liquid_balance == ASSET( "1.000 TTR" ) );
       validate_database();
 
 
@@ -1721,8 +1721,8 @@ BOOST_AUTO_TEST_CASE( apply_transfer_to_savings )
       tx.sign( alice_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_account( "alice" ).zbd_balance == ASSET( "8.000 TBD" ) );
-      BOOST_REQUIRE( db->get_account( "bob" ).savings_zbd_balance == ASSET( "1.000 TBD" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).dollar_balance == ASSET( "8.000 TBD" ) );
+      BOOST_REQUIRE( db->get_account( "bob" ).savings_dollar_balance == ASSET( "1.000 TBD" ) );
       validate_database();
    }
    FC_LOG_AND_RETHROW()
@@ -1870,8 +1870,8 @@ BOOST_AUTO_TEST_CASE( apply_transfer_from_savings )
       tx.sign( alice_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_account( "alice" ).balance == ASSET( "0.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( "alice" ).savings_balance == ASSET( "9.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == ASSET( "0.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).savings_liquid_balance == ASSET( "9.000 TTR" ) );
       BOOST_REQUIRE( db->get_account( "alice" ).savings_withdraw_requests == 1 );
       BOOST_REQUIRE( db->get_savings_withdraw( "alice", op.request_id ).from == op.from );
       BOOST_REQUIRE( db->get_savings_withdraw( "alice", op.request_id ).to == op.to );
@@ -1891,8 +1891,8 @@ BOOST_AUTO_TEST_CASE( apply_transfer_from_savings )
       tx.sign( alice_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_account( "alice" ).zbd_balance == ASSET( "0.000 TBD" ) );
-      BOOST_REQUIRE( db->get_account( "alice" ).savings_zbd_balance == ASSET( "9.000 TBD" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).dollar_balance == ASSET( "0.000 TBD" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).savings_dollar_balance == ASSET( "9.000 TBD" ) );
       BOOST_REQUIRE( db->get_account( "alice" ).savings_withdraw_requests == 2 );
       BOOST_REQUIRE( db->get_savings_withdraw( "alice", op.request_id ).from == op.from );
       BOOST_REQUIRE( db->get_savings_withdraw( "alice", op.request_id ).to == op.to );
@@ -1922,8 +1922,8 @@ BOOST_AUTO_TEST_CASE( apply_transfer_from_savings )
       tx.sign( alice_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_account( "alice" ).balance == ASSET( "0.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( "alice" ).savings_balance == ASSET( "8.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == ASSET( "0.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).savings_liquid_balance == ASSET( "8.000 TTR" ) );
       BOOST_REQUIRE( db->get_account( "alice" ).savings_withdraw_requests == 3 );
       BOOST_REQUIRE( db->get_savings_withdraw( "alice", op.request_id ).from == op.from );
       BOOST_REQUIRE( db->get_savings_withdraw( "alice", op.request_id ).to == op.to );
@@ -1943,8 +1943,8 @@ BOOST_AUTO_TEST_CASE( apply_transfer_from_savings )
       tx.sign( alice_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_account( "alice" ).zbd_balance == ASSET( "0.000 TBD" ) );
-      BOOST_REQUIRE( db->get_account( "alice" ).savings_zbd_balance == ASSET( "8.000 TBD" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).dollar_balance == ASSET( "0.000 TBD" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).savings_dollar_balance == ASSET( "8.000 TBD" ) );
       BOOST_REQUIRE( db->get_account( "alice" ).savings_withdraw_requests == 4 );
       BOOST_REQUIRE( db->get_savings_withdraw( "alice", op.request_id ).from == op.from );
       BOOST_REQUIRE( db->get_savings_withdraw( "alice", op.request_id ).to == op.to );
@@ -1958,19 +1958,19 @@ BOOST_AUTO_TEST_CASE( apply_transfer_from_savings )
       BOOST_TEST_MESSAGE( "--- withdraw on timeout" );
       generate_blocks( db->head_block_time() + ZATTERA_SAVINGS_WITHDRAW_TIME - fc::seconds( ZATTERA_BLOCK_INTERVAL ), true );
 
-      BOOST_REQUIRE( db->get_account( "alice" ).balance == ASSET( "0.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( "alice" ).zbd_balance == ASSET( "0.000 TBD" ) );
-      BOOST_REQUIRE( db->get_account( "bob" ).balance == ASSET( "0.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( "bob" ).zbd_balance == ASSET( "0.000 TBD" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == ASSET( "0.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).dollar_balance == ASSET( "0.000 TBD" ) );
+      BOOST_REQUIRE( db->get_account( "bob" ).liquid_balance == ASSET( "0.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "bob" ).dollar_balance == ASSET( "0.000 TBD" ) );
       BOOST_REQUIRE( db->get_account( "alice" ).savings_withdraw_requests == 4 );
       validate_database();
 
       generate_block();
 
-      BOOST_REQUIRE( db->get_account( "alice" ).balance == ASSET( "1.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( "alice" ).zbd_balance == ASSET( "1.000 TBD" ) );
-      BOOST_REQUIRE( db->get_account( "bob" ).balance == ASSET( "1.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( "bob" ).zbd_balance == ASSET( "1.000 TBD" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == ASSET( "1.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).dollar_balance == ASSET( "1.000 TBD" ) );
+      BOOST_REQUIRE( db->get_account( "bob" ).liquid_balance == ASSET( "1.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "bob" ).dollar_balance == ASSET( "1.000 TBD" ) );
       BOOST_REQUIRE( db->get_account( "alice" ).savings_withdraw_requests == 0 );
       validate_database();
 
@@ -2113,11 +2113,11 @@ BOOST_AUTO_TEST_CASE( apply_cancel_transfer_from_savings )
       tx.sign( alice_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_account( "alice" ).balance == ASSET( "0.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( "alice" ).savings_balance == ASSET( "10.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == ASSET( "0.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "alice" ).savings_liquid_balance == ASSET( "10.000 TTR" ) );
       BOOST_REQUIRE( db->get_account( "alice" ).savings_withdraw_requests == 0 );
-      BOOST_REQUIRE( db->get_account( "bob" ).balance == ASSET( "0.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( "bob" ).savings_balance == ASSET( "0.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "bob" ).liquid_balance == ASSET( "0.000 TTR" ) );
+      BOOST_REQUIRE( db->get_account( "bob" ).savings_liquid_balance == ASSET( "0.000 TTR" ) );
       BOOST_REQUIRE( db->get_account( "bob" ).savings_withdraw_requests == 0 );
       validate_database();
    }

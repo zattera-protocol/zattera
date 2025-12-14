@@ -31,7 +31,7 @@
     "median_props": {
         "account_creation_fee": "0.000 TTR",
         "maximum_block_size": 131072,
-        "zbd_interest_rate": 1000
+        "dollar_interest_rate": 1000
     },
     "miner_weight": 1,
     "next_shuffle_block_num": 1,

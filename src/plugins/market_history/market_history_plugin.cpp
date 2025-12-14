@@ -63,8 +63,8 @@ void market_history_plugin_impl::on_post_apply_operation( const operation_notifi
                b.open = open;
                b.seconds = bucket;
 
-               b.ztr.fill( ( op.open_pays.symbol == ZTR_SYMBOL ) ? op.open_pays.amount : op.current_pays.amount );
-               b.non_ztr.fill( ( op.open_pays.symbol == ZTR_SYMBOL ) ? op.current_pays.amount : op.open_pays.amount );
+               b.liquid.fill( ( op.open_pays.symbol == ZTR_SYMBOL ) ? op.open_pays.amount : op.current_pays.amount );
+               b.dollars.fill( ( op.open_pays.symbol == ZTR_SYMBOL ) ? op.current_pays.amount : op.open_pays.amount );
             });
          }
          else
@@ -73,46 +73,46 @@ void market_history_plugin_impl::on_post_apply_operation( const operation_notifi
             {
                if( op.open_pays.symbol == ZTR_SYMBOL )
                {
-                  b.ztr.volume += op.open_pays.amount;
-                  b.ztr.close = op.open_pays.amount;
+                  b.liquid.volume += op.open_pays.amount;
+                  b.liquid.close = op.open_pays.amount;
 
-                  b.non_ztr.volume += op.current_pays.amount;
-                  b.non_ztr.close = op.current_pays.amount;
+                  b.dollars.volume += op.current_pays.amount;
+                  b.dollars.close = op.current_pays.amount;
 
                   if( b.high() < price( op.current_pays, op.open_pays ) )
                   {
-                     b.ztr.high = op.open_pays.amount;
+                     b.liquid.high = op.open_pays.amount;
 
-                     b.non_ztr.high = op.current_pays.amount;
+                     b.dollars.high = op.current_pays.amount;
                   }
 
                   if( b.low() > price( op.current_pays, op.open_pays ) )
                   {
-                     b.ztr.low = op.open_pays.amount;
+                     b.liquid.low = op.open_pays.amount;
 
-                     b.non_ztr.low = op.current_pays.amount;
+                     b.dollars.low = op.current_pays.amount;
                   }
                }
                else
                {
-                  b.ztr.volume += op.current_pays.amount;
-                  b.ztr.close = op.current_pays.amount;
+                  b.liquid.volume += op.current_pays.amount;
+                  b.liquid.close = op.current_pays.amount;
 
-                  b.non_ztr.volume += op.open_pays.amount;
-                  b.non_ztr.close = op.open_pays.amount;
+                  b.dollars.volume += op.open_pays.amount;
+                  b.dollars.close = op.open_pays.amount;
 
                   if( b.high() < price( op.open_pays, op.current_pays ) )
                   {
-                     b.ztr.high = op.current_pays.amount;
+                     b.liquid.high = op.current_pays.amount;
 
-                     b.non_ztr.high = op.open_pays.amount;
+                     b.dollars.high = op.open_pays.amount;
                   }
 
                   if( b.low() > price( op.open_pays, op.current_pays ) )
                   {
-                     b.ztr.low = op.current_pays.amount;
+                     b.liquid.low = op.current_pays.amount;
 
-                     b.non_ztr.low = op.open_pays.amount;
+                     b.dollars.low = op.open_pays.amount;
                   }
                }
             });

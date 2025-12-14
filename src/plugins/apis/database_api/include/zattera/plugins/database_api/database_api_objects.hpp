@@ -176,21 +176,21 @@ struct api_account_object
       can_vote( a.can_vote ),
       voting_power( a.voting_power ),
       last_vote_time( a.last_vote_time ),
-      balance( a.balance ),
-      savings_balance( a.savings_balance ),
-      zbd_balance( a.zbd_balance ),
-      zbd_seconds( a.zbd_seconds ),
-      zbd_seconds_last_update( a.zbd_seconds_last_update ),
-      zbd_last_interest_payment( a.zbd_last_interest_payment ),
-      savings_zbd_balance( a.savings_zbd_balance ),
-      savings_zbd_seconds( a.savings_zbd_seconds ),
-      savings_zbd_seconds_last_update( a.savings_zbd_seconds_last_update ),
-      savings_zbd_last_interest_payment( a.savings_zbd_last_interest_payment ),
+      liquid_balance( a.liquid_balance ),
+      savings_liquid_balance( a.savings_liquid_balance ),
+      dollar_balance( a.dollar_balance ),
+      dollar_seconds( a.dollar_seconds ),
+      dollar_seconds_last_update( a.dollar_seconds_last_update ),
+      dollar_last_interest_payment( a.dollar_last_interest_payment ),
+      savings_dollar_balance( a.savings_dollar_balance ),
+      savings_dollar_seconds( a.savings_dollar_seconds ),
+      savings_dollar_seconds_last_update( a.savings_dollar_seconds_last_update ),
+      savings_dollar_last_interest_payment( a.savings_dollar_last_interest_payment ),
       savings_withdraw_requests( a.savings_withdraw_requests ),
-      reward_zbd_balance( a.reward_zbd_balance ),
-      reward_ztr_balance( a.reward_ztr_balance ),
-      reward_vesting_balance( a.reward_vesting_balance ),
-      reward_vesting_ztr( a.reward_vesting_ztr ),
+      reward_dollar_balance( a.reward_dollar_balance ),
+      reward_liquid_balance( a.reward_liquid_balance ),
+      reward_vesting_share_balance( a.reward_vesting_share_balance ),
+      reward_vesting_liquid_balance( a.reward_vesting_liquid_balance ),
       curation_rewards( a.curation_rewards ),
       posting_rewards( a.posting_rewards ),
       vesting_shares( a.vesting_shares ),
@@ -246,25 +246,25 @@ struct api_account_object
    uint16_t          voting_power = 0;
    time_point_sec    last_vote_time;
 
-   asset             balance;
-   asset             savings_balance;
+   asset             liquid_balance;
+   asset             savings_liquid_balance;
 
-   asset             zbd_balance;
-   uint128_t         zbd_seconds;
-   time_point_sec    zbd_seconds_last_update;
-   time_point_sec    zbd_last_interest_payment;
+   asset             dollar_balance;
+   uint128_t         dollar_seconds;
+   time_point_sec    dollar_seconds_last_update;
+   time_point_sec    dollar_last_interest_payment;
 
-   asset             savings_zbd_balance;
-   uint128_t         savings_zbd_seconds;
-   time_point_sec    savings_zbd_seconds_last_update;
-   time_point_sec    savings_zbd_last_interest_payment;
+   asset             savings_dollar_balance;
+   uint128_t         savings_dollar_seconds;
+   time_point_sec    savings_dollar_seconds_last_update;
+   time_point_sec    savings_dollar_last_interest_payment;
 
    uint8_t           savings_withdraw_requests = 0;
 
-   asset             reward_zbd_balance;
-   asset             reward_ztr_balance;
-   asset             reward_vesting_balance;
-   asset             reward_vesting_ztr;
+   asset             reward_dollar_balance;
+   asset             reward_liquid_balance;
+   asset             reward_vesting_share_balance;
+   asset             reward_vesting_liquid_balance;
 
    share_type        curation_rewards;
    share_type        posting_rewards;
@@ -376,8 +376,8 @@ struct api_witness_object
       last_confirmed_block_num( w.last_confirmed_block_num ),
       signing_key( w.signing_key ),
       props( w.props ),
-      zbd_exchange_rate( w.zbd_exchange_rate ),
-      last_zbd_exchange_update( w.last_zbd_exchange_update ),
+      dollar_exchange_rate( w.dollar_exchange_rate ),
+      last_dollar_exchange_update( w.last_dollar_exchange_update ),
       votes( w.votes ),
       virtual_last_update( w.virtual_last_update ),
       virtual_position( w.virtual_position ),
@@ -399,8 +399,8 @@ struct api_witness_object
    uint64_t          last_confirmed_block_num = 0;
    public_key_type   signing_key;
    chain_properties  props;
-   price             zbd_exchange_rate;
-   time_point_sec    last_zbd_exchange_update;
+   price             dollar_exchange_rate;
+   time_point_sec    last_dollar_exchange_update;
    share_type        votes;
    fc::uint128       virtual_last_update;
    fc::uint128       virtual_position;
@@ -503,8 +503,8 @@ struct order
 {
    price                order_price;
    double               real_price; // dollars per ztr
-   share_type           ztr;
-   share_type           zbd;
+   share_type           liquid;
+   share_type           dollars;
    fc::time_point_sec   created;
 };
 
@@ -538,11 +538,11 @@ FC_REFLECT( zattera::plugins::database_api::api_account_object,
              (created)(mined)
              (recovery_account)(last_account_recovery)(reset_account)
              (comment_count)(lifetime_vote_count)(post_count)(can_vote)(voting_power)(last_vote_time)
-             (balance)
-             (savings_balance)
-             (zbd_balance)(zbd_seconds)(zbd_seconds_last_update)(zbd_last_interest_payment)
-             (savings_zbd_balance)(savings_zbd_seconds)(savings_zbd_seconds_last_update)(savings_zbd_last_interest_payment)(savings_withdraw_requests)
-             (reward_zbd_balance)(reward_ztr_balance)(reward_vesting_balance)(reward_vesting_ztr)
+             (liquid_balance)
+             (savings_liquid_balance)
+             (dollar_balance)(dollar_seconds)(dollar_seconds_last_update)(dollar_last_interest_payment)
+             (savings_dollar_balance)(savings_dollar_seconds)(savings_dollar_seconds_last_update)(savings_dollar_last_interest_payment)(savings_withdraw_requests)
+             (reward_dollar_balance)(reward_liquid_balance)(reward_vesting_share_balance)(reward_vesting_liquid_balance)
              (vesting_shares)(delegated_vesting_shares)(received_vesting_shares)(vesting_withdraw_rate)(next_vesting_withdrawal)(withdrawn)(to_withdraw)(withdraw_routes)
              (curation_rewards)
              (posting_rewards)
@@ -587,7 +587,7 @@ FC_REFLECT( zattera::plugins::database_api::api_witness_object,
              (url)(votes)(virtual_last_update)(virtual_position)(virtual_scheduled_time)(total_missed)
              (last_aslot)(last_confirmed_block_num)(signing_key)
              (props)
-             (zbd_exchange_rate)(last_zbd_exchange_update)
+             (dollar_exchange_rate)(last_dollar_exchange_update)
              (last_work)
              (running_version)
              (hardfork_version_vote)(hardfork_time_vote)
@@ -624,6 +624,6 @@ FC_REFLECT( zattera::plugins::database_api::api_hardfork_property_object,
             (next_hardfork_time)
           )
 
-FC_REFLECT( zattera::plugins::database_api::order, (order_price)(real_price)(ztr)(zbd)(created) );
+FC_REFLECT( zattera::plugins::database_api::order, (order_price)(real_price)(liquid)(dollars)(created) );
 
 FC_REFLECT( zattera::plugins::database_api::order_book, (asks)(bids) );

@@ -38,7 +38,7 @@ namespace zattera { namespace chain {
        *  to tune rate limiting and capacity
        */
       uint32_t          maximum_block_size = ZATTERA_MIN_BLOCK_SIZE_LIMIT * 2;
-      uint16_t          zbd_interest_rate  = ZATTERA_DEFAULT_ZBD_INTEREST_RATE;
+      uint16_t          dollar_interest_rate  = ZATTERA_DEFAULT_ZBD_INTEREST_RATE;
       uint32_t          account_subsidy_limit = 0;
    };
 
@@ -82,8 +82,8 @@ namespace zattera { namespace chain {
          public_key_type   signing_key;
 
          chain_properties  props;
-         price             zbd_exchange_rate;
-         time_point_sec    last_zbd_exchange_update;
+         price             dollar_exchange_rate;
+         time_point_sec    last_dollar_exchange_update;
 
 
          /**
@@ -249,7 +249,7 @@ FC_REFLECT_ENUM( zattera::chain::witness_object::witness_schedule_type, (top20)(
 FC_REFLECT( zattera::chain::chain_properties,
              (account_creation_fee)
              (maximum_block_size)
-             (zbd_interest_rate)
+             (dollar_interest_rate)
              (account_subsidy_limit)
           )
 
@@ -260,7 +260,7 @@ FC_REFLECT( zattera::chain::witness_object,
              (url)(votes)(schedule)(virtual_last_update)(virtual_position)(virtual_scheduled_time)(total_missed)
              (last_aslot)(last_confirmed_block_num)(signing_key)
              (props)
-             (zbd_exchange_rate)(last_zbd_exchange_update)
+             (dollar_exchange_rate)(last_dollar_exchange_update)
              (last_work)
              (running_version)
              (hardfork_version_vote)(hardfork_time_vote)
