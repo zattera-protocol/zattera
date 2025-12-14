@@ -323,7 +323,7 @@ On a testnet or genesis chain where you control genesis:
 
 ```bash
 # Convert ZBD to ZTR (3.5 day conversion)
->>> convert_sbd alice "10.000 ZBD" true
+>>> convert_dollar alice "10.000 ZBD" true
 ```
 
 ## Content Operations
