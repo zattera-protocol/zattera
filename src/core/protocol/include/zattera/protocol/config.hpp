@@ -37,7 +37,7 @@
 
 #define ZATTERA_BLOCKCHAIN_VERSION              ( version(0, 0, 0) )
 
-#define ZATTERA_GENESIS_PUBLIC_KEY_STR          "ZTR8MxbBULHYSq5MzAak5KK2pqvB7QdGmmuDqxDY8KDnsdSBM5T4K"
+#define ZATTERA_GENESIS_PUBLIC_KEY_STR          "ZTR7ssqjc3em9Yu7ijpMV6CnSLwYA1WA9KrFFoqMbdEL6JUx5PtGb"
 #define ZATTERA_CHAIN_ID_NAME                   "zattera"
 #define ZATTERA_ADDRESS_PREFIX                  "ZTR"
 
