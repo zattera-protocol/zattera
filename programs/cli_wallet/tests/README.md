@@ -54,7 +54,7 @@ Tests all wallet transaction commands with `broadcast=false` to validate command
 5. Escrow Commands (4 tests)
    - escrow_transfer, escrow_approve, escrow_dispute, escrow_release
 6. Market/Trading Commands (3 tests)
-   - create_order, cancel_order, convert_zbd
+   - create_order, cancel_order, convert_dollar
 7. Content Commands (3 tests)
    - post_comment, vote, follow
 8. Recovery Commands (3 tests)
