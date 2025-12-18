@@ -394,7 +394,7 @@ void chain_plugin::plugin_initialize(const variables_map& options) {
    }
 
    // Set chain ID and address prefix in database
-   chain_id_type chain_id = fc::sha256::hash( chain_id_name );
+   chain_id_type chain_id = generate_chain_id( chain_id_name );
    my->db.set_chain_id( chain_id, chain_id_name );
    ilog( "Chain ID: '${name}'", ("name", chain_id_name) );
 

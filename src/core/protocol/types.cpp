@@ -177,7 +177,7 @@ namespace zattera { namespace protocol {
 
    chain_id_type generate_chain_id( const std::string& chain_id_name )
    {
-      return fc::sha256::hash( chain_id_name.c_str() );
+      return fc::sha256::hash( chain_id_name );
    }
 
 } } // zattera::protocol
