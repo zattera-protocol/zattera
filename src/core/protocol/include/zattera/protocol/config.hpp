@@ -45,7 +45,7 @@
 #define ZATTERA_CASHOUT_WINDOW_SECONDS          (60*60*24*7)  // 7 days
 #define ZATTERA_UPVOTE_LOCKOUT                  (fc::hours(12))
 
-#define ZATTERA_MIN_ACCOUNT_CREATION_FEE        1
+#define ZATTERA_MIN_ACCOUNT_CREATION_FEE        0
 
 #define ZATTERA_OWNER_AUTH_RECOVERY_PERIOD                  fc::days(30)
 #define ZATTERA_ACCOUNT_RECOVERY_REQUEST_EXPIRATION_PERIOD  fc::days(1)
