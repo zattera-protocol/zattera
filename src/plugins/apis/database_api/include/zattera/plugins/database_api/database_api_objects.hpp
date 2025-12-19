@@ -193,9 +193,9 @@ struct api_account_object
       reward_vesting_liquid_balance( a.reward_vesting_liquid_balance ),
       curation_rewards( a.curation_rewards ),
       posting_rewards( a.posting_rewards ),
-      vesting_shares( a.vesting_shares ),
-      delegated_vesting_shares( a.delegated_vesting_shares ),
-      received_vesting_shares( a.received_vesting_shares ),
+      vesting_share_balance( a.vesting_share_balance ),
+      delegated_vesting_share_balance( a.delegated_vesting_share_balance ),
+      received_vesting_share_balance( a.received_vesting_share_balance ),
       vesting_withdraw_rate( a.vesting_withdraw_rate ),
       next_vesting_withdrawal( a.next_vesting_withdrawal ),
       withdrawn( a.withdrawn ),
@@ -269,9 +269,9 @@ struct api_account_object
    share_type        curation_rewards;
    share_type        posting_rewards;
 
-   asset             vesting_shares;
-   asset             delegated_vesting_shares;
-   asset             received_vesting_shares;
+   asset             vesting_share_balance;
+   asset             delegated_vesting_share_balance;
+   asset             received_vesting_share_balance;
    asset             vesting_withdraw_rate;
    time_point_sec    next_vesting_withdrawal;
    share_type        withdrawn;
@@ -543,7 +543,7 @@ FC_REFLECT( zattera::plugins::database_api::api_account_object,
              (dollar_balance)(dollar_seconds)(dollar_seconds_last_update)(dollar_last_interest_payment)
              (savings_dollar_balance)(savings_dollar_seconds)(savings_dollar_seconds_last_update)(savings_dollar_last_interest_payment)(savings_withdraw_requests)
              (reward_dollar_balance)(reward_liquid_balance)(reward_vesting_share_balance)(reward_vesting_liquid_balance)
-             (vesting_shares)(delegated_vesting_shares)(received_vesting_shares)(vesting_withdraw_rate)(next_vesting_withdrawal)(withdrawn)(to_withdraw)(withdraw_routes)
+             (vesting_share_balance)(delegated_vesting_share_balance)(received_vesting_share_balance)(vesting_withdraw_rate)(next_vesting_withdrawal)(withdrawn)(to_withdraw)(withdraw_routes)
              (curation_rewards)
              (posting_rewards)
              (proxied_vsf_votes)(witnesses_voted_for)

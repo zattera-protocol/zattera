@@ -719,11 +719,11 @@ public:
          asset total_dollar(0, ZBD_SYMBOL );
          for( const auto& a : accounts ) {
             total_liquid += a.liquid_balance;
-            total_vest  += a.vesting_shares;
+            total_vest  += a.vesting_share_balance;
             total_dollar  += a.dollar_balance;
             out << std::left << std::setw( 17 ) << std::string(a.name)
                 << std::right << std::setw(18) << fc::variant(a.liquid_balance).as_string() <<" "
-                << std::right << std::setw(26) << fc::variant(a.vesting_shares).as_string() <<" "
+                << std::right << std::setw(26) << fc::variant(a.vesting_share_balance).as_string() <<" "
                 << std::right << std::setw(16) << fc::variant(a.dollar_balance).as_string() <<"\n";
          }
          out << "-------------------------------------------------------------------------\n";

@@ -612,7 +612,7 @@ const reward_fund_object& database::get_reward_fund( const comment_object& c ) c
 asset database::get_effective_vesting_shares( const account_object& account, asset_symbol_type vested_symbol )const
 {
    if( vested_symbol == VESTS_SYMBOL )
-      return account.vesting_shares - account.delegated_vesting_shares + account.received_vesting_shares;
+      return account.vesting_share_balance - account.delegated_vesting_share_balance + account.received_vesting_share_balance;
 
    FC_ASSERT( false, "Invalid symbol" );
 }
@@ -1348,20 +1348,20 @@ void database::clear_null_account_balance()
       adjust_savings_liquid_balance( null_account, -null_account.savings_dollar_balance );
    }
 
-   if( null_account.vesting_shares.amount > 0 )
+   if( null_account.vesting_share_balance.amount > 0 )
    {
       const auto& gpo = get_dynamic_global_properties();
-      auto converted_liquid = null_account.vesting_shares * gpo.get_vesting_share_price();
+      auto converted_liquid = null_account.vesting_share_balance * gpo.get_vesting_share_price();
 
       modify( gpo, [&]( dynamic_global_property_object& g )
       {
-         g.total_vesting_shares -= null_account.vesting_shares;
+         g.total_vesting_shares -= null_account.vesting_share_balance;
          g.total_vesting_fund_liquid -= converted_liquid;
       });
 
       modify( null_account, [&]( account_object& a )
       {
-         a.vesting_shares.amount = 0;
+         a.vesting_share_balance.amount = 0;
       });
 
       total_liquid += converted_liquid;
@@ -1461,9 +1461,9 @@ void database::process_vesting_withdrawals()
       */
       share_type to_withdraw;
       if ( from_account.to_withdraw - from_account.withdrawn < from_account.vesting_withdraw_rate.amount )
-         to_withdraw = std::min( from_account.vesting_shares.amount, from_account.to_withdraw % from_account.vesting_withdraw_rate.amount ).value;
+         to_withdraw = std::min( from_account.vesting_share_balance.amount, from_account.to_withdraw % from_account.vesting_withdraw_rate.amount ).value;
       else
-         to_withdraw = std::min( from_account.vesting_shares.amount, from_account.vesting_withdraw_rate.amount ).value;
+         to_withdraw = std::min( from_account.vesting_share_balance.amount, from_account.vesting_withdraw_rate.amount ).value;
 
       share_type vests_deposited_as_liquid = 0;
       share_type vests_deposited_as_vests = 0;
@@ -1485,7 +1485,7 @@ void database::process_vesting_withdrawals()
 
                modify( to_account, [&]( account_object& a )
                {
-                  a.vesting_shares.amount += to_deposit;
+                  a.vesting_share_balance.amount += to_deposit;
                });
 
                adjust_proxied_witness_votes( to_account, to_deposit );
@@ -1533,11 +1533,11 @@ void database::process_vesting_withdrawals()
 
       modify( from_account, [&]( account_object& a )
       {
-         a.vesting_shares.amount -= to_withdraw;
+         a.vesting_share_balance.amount -= to_withdraw;
          a.liquid_balance += converted_liquid;
          a.withdrawn += to_withdraw;
 
-         if( a.withdrawn >= a.to_withdraw || a.vesting_shares.amount == 0 )
+         if( a.withdrawn >= a.to_withdraw || a.vesting_share_balance.amount == 0 )
          {
             a.vesting_withdraw_rate.amount = 0;
             a.next_vesting_withdrawal = fc::time_point_sec::maximum();
@@ -2112,7 +2112,7 @@ void database::process_decline_voting_rights()
 
       /// remove all current votes
       std::array<share_type, ZATTERA_MAX_PROXY_RECURSION_DEPTH+1> delta;
-      delta[0] = -account.vesting_shares.amount;
+      delta[0] = -account.vesting_share_balance.amount;
       for( int i = 0; i < ZATTERA_MAX_PROXY_RECURSION_DEPTH; ++i )
          delta[i+1] = -account.proxied_vsf_votes[i];
       adjust_proxied_witness_votes( account, delta );
@@ -3487,10 +3487,10 @@ void database::clear_expired_delegations()
    {
       modify( get_account( itr->delegator ), [&]( account_object& a )
       {
-         a.delegated_vesting_shares -= itr->vesting_shares;
+         a.delegated_vesting_share_balance -= itr->vesting_share_balance;
       });
 
-      push_virtual_operation( return_vesting_delegation_operation( itr->delegator, itr->vesting_shares ) );
+      push_virtual_operation( return_vesting_delegation_operation( itr->delegator, itr->vesting_share_balance ) );
 
       remove( *itr );
       itr = delegations_by_exp.begin();
@@ -3544,10 +3544,10 @@ void database::modify_balance( const account_object& a, const asset& delta, bool
             }
             break;
          case ZATTERA_ASSET_NUM_VESTS:
-            acnt.vesting_shares += delta;
+            acnt.vesting_share_balance += delta;
             if( check_balance )
             {
-               FC_ASSERT( acnt.vesting_shares.amount.value >= 0, "Insufficient VESTS funds" );
+               FC_ASSERT( acnt.vesting_share_balance.amount.value >= 0, "Insufficient VESTS funds" );
             }
             break;
          default:
@@ -3834,14 +3834,14 @@ void database::validate_invariants()const
          total_dollars += itr->dollar_balance;
          total_dollars += itr->savings_dollar_balance;
          total_dollars += itr->reward_dollar_balance;
-         total_vesting += itr->vesting_shares;
+         total_vesting += itr->vesting_share_balance;
          total_vesting += itr->reward_vesting_share_balance;
          pending_vesting_liquid += itr->reward_vesting_liquid_balance;
          total_vsf_votes += ( itr->proxy == ZATTERA_PROXY_TO_SELF_ACCOUNT ?
                                  itr->witness_vote_weight() :
                                  ( ZATTERA_MAX_PROXY_RECURSION_DEPTH > 0 ?
                                       itr->proxied_vsf_votes[ZATTERA_MAX_PROXY_RECURSION_DEPTH - 1] :
-                                      itr->vesting_shares.amount ) );
+                                      itr->vesting_share_balance.amount ) );
       }
 
       const auto& convert_request_idx = get_index< convert_request_index >().indices();

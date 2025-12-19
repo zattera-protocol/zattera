@@ -89,9 +89,9 @@ namespace zattera { namespace chain {
          share_type        curation_rewards = 0;
          share_type        posting_rewards = 0;
 
-         asset             vesting_shares = asset( 0, VESTS_SYMBOL ); ///< total vesting shares held by this account, controls its voting power
-         asset             delegated_vesting_shares = asset( 0, VESTS_SYMBOL );
-         asset             received_vesting_shares = asset( 0, VESTS_SYMBOL );
+         asset             vesting_share_balance = asset( 0, VESTS_SYMBOL ); ///< total vesting shares held by this account, controls its voting power
+         asset             delegated_vesting_share_balance = asset( 0, VESTS_SYMBOL );
+         asset             received_vesting_share_balance = asset( 0, VESTS_SYMBOL );
 
          asset             vesting_withdraw_rate = asset( 0, VESTS_SYMBOL ); ///< at the time this is updated it can be at most vesting_shares/104
          time_point_sec    next_vesting_withdrawal = fc::time_point_sec::maximum(); ///< after every withdrawal this is incremented by 1 week
@@ -113,7 +113,7 @@ namespace zattera { namespace chain {
          share_type        witness_vote_weight()const {
             return std::accumulate( proxied_vsf_votes.begin(),
                                     proxied_vsf_votes.end(),
-                                    vesting_shares.amount );
+                                    vesting_share_balance.amount );
          }
          share_type        proxied_vsf_votes_total()const {
             return std::accumulate( proxied_vsf_votes.begin(),
@@ -159,7 +159,7 @@ namespace zattera { namespace chain {
          id_type           id;
          account_name_type delegator;
          account_name_type delegatee;
-         asset             vesting_shares;
+         asset             vesting_share_balance;
          time_point_sec    min_delegation_time;
    };
 
@@ -176,7 +176,7 @@ namespace zattera { namespace chain {
 
          id_type           id;
          account_name_type delegator;
-         asset             vesting_shares;
+         asset             vesting_share_balance;
          time_point_sec    expiration;
    };
 
@@ -411,7 +411,7 @@ FC_REFLECT( zattera::chain::account_object,
              (dollar_balance)(dollar_seconds)(dollar_seconds_last_update)(dollar_last_interest_payment)
              (savings_dollar_balance)(savings_dollar_seconds)(savings_dollar_seconds_last_update)(savings_dollar_last_interest_payment)(savings_withdraw_requests)
              (reward_liquid_balance)(reward_dollar_balance)(reward_vesting_share_balance)(reward_vesting_liquid_balance)
-             (vesting_shares)(delegated_vesting_shares)(received_vesting_shares)
+             (vesting_share_balance)(delegated_vesting_share_balance)(received_vesting_share_balance)
              (vesting_withdraw_rate)(next_vesting_withdrawal)(withdrawn)(to_withdraw)(withdraw_routes)
              (curation_rewards)
              (posting_rewards)
@@ -428,11 +428,11 @@ FC_REFLECT( zattera::chain::account_authority_object,
 CHAINBASE_SET_INDEX_TYPE( zattera::chain::account_authority_object, zattera::chain::account_authority_index )
 
 FC_REFLECT( zattera::chain::vesting_delegation_object,
-            (id)(delegator)(delegatee)(vesting_shares)(min_delegation_time) )
+            (id)(delegator)(delegatee)(vesting_share_balance)(min_delegation_time) )
 CHAINBASE_SET_INDEX_TYPE( zattera::chain::vesting_delegation_object, zattera::chain::vesting_delegation_index )
 
 FC_REFLECT( zattera::chain::vesting_delegation_expiration_object,
-            (id)(delegator)(vesting_shares)(expiration) )
+            (id)(delegator)(vesting_share_balance)(expiration) )
 CHAINBASE_SET_INDEX_TYPE( zattera::chain::vesting_delegation_expiration_object, zattera::chain::vesting_delegation_expiration_index )
 
 FC_REFLECT( zattera::chain::owner_authority_history_object,
