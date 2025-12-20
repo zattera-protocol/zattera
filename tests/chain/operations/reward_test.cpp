@@ -197,7 +197,7 @@ BOOST_AUTO_TEST_CASE( apply_reward_balance_claim )
       tx.sign( alice_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == alice_liquid + op.reward_liquids );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == alice_liquid_balance + op.reward_liquids );
       BOOST_REQUIRE( db->get_account( "alice" ).reward_liquid_balance == ASSET( "0.000 TTR" ) );
       BOOST_REQUIRE( db->get_account( "alice" ).dollar_balance == alice_dollar_balance + op.reward_dollars );
       BOOST_REQUIRE( db->get_account( "alice" ).reward_dollar_balance == ASSET( "0.000 TBD" ) );

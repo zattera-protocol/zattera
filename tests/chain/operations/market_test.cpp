@@ -1344,8 +1344,8 @@ BOOST_AUTO_TEST_CASE( maintain_dollar_stability )
       auto comment_reward = ( gpo.total_reward_fund_liquid.amount + 2000 ) - ( ( gpo.total_reward_fund_liquid.amount + 2000 ) * 25 * ZATTERA_1_PERCENT ) / ZATTERA_100_PERCENT ;
       comment_reward /= 2;
       auto dollar_reward = ( comment_reward * gpo.dollar_print_rate ) / ZATTERA_100_PERCENT;
-      auto alice_dollar = db->get_account( "alice" ).dollar_balance + db->get_account( "alice" ).reward_dollar_balance + asset( dollar_reward, ZTR_SYMBOL ) * exchange_rate;
-      auto alice_liquid = db->get_account( "alice" ).liquid_balance + db->get_account( "alice" ).reward_liquid_balance ;
+      auto alice_dollar_balance = db->get_account( "alice" ).dollar_balance + db->get_account( "alice" ).reward_dollar_balance + asset( dollar_reward, ZTR_SYMBOL ) * exchange_rate;
+      auto alice_liquid_balance = db->get_account( "alice" ).liquid_balance + db->get_account( "alice" ).reward_liquid_balance ;
 
       BOOST_TEST_MESSAGE( "Checking printing ZBD has slowed" );
       BOOST_REQUIRE( db->get_dynamic_global_properties().dollar_print_rate < ZATTERA_100_PERCENT );
@@ -1355,8 +1355,8 @@ BOOST_AUTO_TEST_CASE( maintain_dollar_stability )
 
       validate_database();
 
-      BOOST_REQUIRE( db->get_account( "alice" ).dollar_balance + db->get_account( "alice" ).reward_dollar_balance == alice_dollar );
-      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance + db->get_account( "alice" ).reward_liquid_balance > alice_liquid );
+      BOOST_REQUIRE( db->get_account( "alice" ).dollar_balance + db->get_account( "alice" ).reward_dollar_balance == alice_dollar_balance );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance + db->get_account( "alice" ).reward_liquid_balance > alice_liquid_balance );
 
       BOOST_TEST_MESSAGE( "Letting percent market cap fall to 2% to verify printing of ZBD turns back on" );
 
@@ -1374,7 +1374,7 @@ BOOST_AUTO_TEST_CASE( maintain_dollar_stability )
       {
          db.modify( db.get_dynamic_global_properties(), [&]( dynamic_global_property_object& gpo )
          {
-            gpo.current_dollar_supply = dollar_initial_supply + alice_dollar + reduced_dollar_balance;
+            gpo.current_dollar_supply = dollar_initial_supply + alice_dollar_balance + reduced_dollar_balance;
          });
       }, database::skip_witness_signature );
 

@@ -12,7 +12,7 @@
 #include <zattera/protocol/version.hpp>
 #include <set>
 
-#ifdef IS_TEST_NET
+#ifdef IS_TEST_MODE
 #define ZATTERA_NUM_HARDFORKS 0
 #else
 #define ZATTERA_NUM_HARDFORKS 0

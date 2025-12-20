@@ -159,7 +159,7 @@ namespace zattera { namespace chain {
          id_type           id;
          account_name_type delegator;
          account_name_type delegatee;
-         asset             vesting_share_balance;
+         asset             vesting_shares;
          time_point_sec    min_delegation_time;
    };
 
@@ -176,7 +176,7 @@ namespace zattera { namespace chain {
 
          id_type           id;
          account_name_type delegator;
-         asset             vesting_share_balance;
+         asset             vesting_shares;
          time_point_sec    expiration;
    };
 
@@ -428,11 +428,11 @@ FC_REFLECT( zattera::chain::account_authority_object,
 CHAINBASE_SET_INDEX_TYPE( zattera::chain::account_authority_object, zattera::chain::account_authority_index )
 
 FC_REFLECT( zattera::chain::vesting_delegation_object,
-            (id)(delegator)(delegatee)(vesting_share_balance)(min_delegation_time) )
+            (id)(delegator)(delegatee)(vesting_shares)(min_delegation_time) )
 CHAINBASE_SET_INDEX_TYPE( zattera::chain::vesting_delegation_object, zattera::chain::vesting_delegation_index )
 
 FC_REFLECT( zattera::chain::vesting_delegation_expiration_object,
-            (id)(delegator)(vesting_share_balance)(expiration) )
+            (id)(delegator)(vesting_shares)(expiration) )
 CHAINBASE_SET_INDEX_TYPE( zattera::chain::vesting_delegation_expiration_object, zattera::chain::vesting_delegation_expiration_index )
 
 FC_REFLECT( zattera::chain::owner_authority_history_object,

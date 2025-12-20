@@ -696,18 +696,15 @@ BOOST_AUTO_TEST_CASE( apply_vesting_shares_delegation )
       db->push_transaction( tx, 0 );
       generate_blocks( 1 );
 
-      const account_object& alice = db->get_account( "alice" );
-      const account_object& bob = db->get_account( "bob" );
-
-      BOOST_REQUIRE( alice.delegated_vesting_share_balance == ASSET( "10000000.000000 VESTS"));
-      BOOST_REQUIRE( bob.received_vesting_share_balance == ASSET( "10000000.000000 VESTS"));
+      BOOST_REQUIRE( db->get_account( "alice" ).delegated_vesting_share_balance == ASSET( "10000000.000000 VESTS"));
+      BOOST_REQUIRE( db->get_account( "bob" ).received_vesting_share_balance == ASSET( "10000000.000000 VESTS"));
 
       BOOST_TEST_MESSAGE( "--- Test that the delegation object is correct. " );
       auto delegation = db->find< vesting_delegation_object, by_delegation >( boost::make_tuple( op.delegator, op.delegatee ) );
 
       BOOST_REQUIRE( delegation != nullptr );
       BOOST_REQUIRE( delegation->delegator == op.delegator);
-      BOOST_REQUIRE( delegation->vesting_shares  == ASSET( "10000000.000000 VESTS"));
+      BOOST_REQUIRE( delegation->vesting_shares == ASSET( "10000000.000000 VESTS"));
 
       validate_database();
       tx.clear();
@@ -721,8 +718,8 @@ BOOST_AUTO_TEST_CASE( apply_vesting_shares_delegation )
       BOOST_REQUIRE( delegation != nullptr );
       BOOST_REQUIRE( delegation->delegator == op.delegator);
       BOOST_REQUIRE( delegation->vesting_shares == ASSET( "20000000.000000 VESTS"));
-      BOOST_REQUIRE( alice.delegated_vesting_share_balance == ASSET( "20000000.000000 VESTS"));
-      BOOST_REQUIRE( bob.received_vesting_share_balance == ASSET( "20000000.000000 VESTS"));
+      BOOST_REQUIRE( db->get_account( "alice" ).delegated_vesting_share_balance == ASSET( "20000000.000000 VESTS"));
+      BOOST_REQUIRE( db->get_account( "bob" ).received_vesting_share_balance == ASSET( "20000000.000000 VESTS"));
 
       BOOST_TEST_MESSAGE( "--- Test that effective vesting shares is accurate and being applied." );
       tx.operations.clear();
@@ -748,7 +745,7 @@ BOOST_AUTO_TEST_CASE( apply_vesting_shares_delegation )
       tx.set_expiration( db->head_block_time() + ZATTERA_MAX_TIME_UNTIL_EXPIRATION );
       tx.operations.push_back( vote_op );
       tx.sign( bob_private_key, db->get_chain_id() );
-      auto old_voting_power = bob.voting_power;
+      auto old_voting_power = db->get_account( "bob" ).voting_power;
 
       db->push_transaction( tx, 0 );
       generate_blocks(1);
@@ -756,9 +753,10 @@ BOOST_AUTO_TEST_CASE( apply_vesting_shares_delegation )
       const auto& vote_idx = db->get_index< comment_vote_index >().indices().get< by_comment_voter >();
 
       auto& alice_comment = db->get_comment( "alice", string( "foo" ) );
-      auto itr = vote_idx.find( std::make_tuple( alice_comment.id, bob.id ) );
-      BOOST_REQUIRE( alice_comment.net_rshares.value == db->get_effective_vesting_shares(bob, VESTS_SYMBOL).amount.value * ( old_voting_power - bob.voting_power ) / ZATTERA_100_PERCENT - ZATTERA_VOTE_DUST_THRESHOLD);
-      BOOST_REQUIRE( itr->rshares == db->get_effective_vesting_shares(bob, VESTS_SYMBOL).amount.value * ( old_voting_power - bob.voting_power ) / ZATTERA_100_PERCENT - ZATTERA_VOTE_DUST_THRESHOLD );
+      const auto& bob_after_vote = db->get_account( "bob" );
+      auto itr = vote_idx.find( std::make_tuple( alice_comment.id, bob_after_vote.id ) );
+      BOOST_REQUIRE( alice_comment.net_rshares.value == db->get_effective_vesting_shares(bob_after_vote, VESTS_SYMBOL).amount.value * ( old_voting_power - bob_after_vote.voting_power ) / ZATTERA_100_PERCENT - ZATTERA_VOTE_DUST_THRESHOLD);
+      BOOST_REQUIRE( itr->rshares == db->get_effective_vesting_shares(bob_after_vote, VESTS_SYMBOL).amount.value * ( old_voting_power - bob_after_vote.voting_power ) / ZATTERA_100_PERCENT - ZATTERA_VOTE_DUST_THRESHOLD );
 
 
       generate_block();
@@ -812,7 +810,7 @@ BOOST_AUTO_TEST_CASE( apply_vesting_shares_delegation )
 
 
       BOOST_TEST_MESSAGE( "--- Test failure powering down vesting shares that are delegated" );
-      sam_vest.amount += 1000;
+      sam_vests_balance.amount += 1000;
       op.vesting_shares = sam_vests_balance;
       tx.clear();
       tx.operations.push_back( op );
@@ -895,11 +893,8 @@ BOOST_AUTO_TEST_CASE( fix_issue_971_vesting_removal )
       db->push_transaction( tx, 0 );
       generate_block();
 
-      const account_object& alice = db->get_account( "alice" );
-      const account_object& bob = db->get_account( "bob" );
-
-      BOOST_REQUIRE( alice.delegated_vesting_share_balance == ASSET( "10000000.000000 VESTS"));
-      BOOST_REQUIRE( bob.received_vesting_share_balance == ASSET( "10000000.000000 VESTS"));
+      BOOST_REQUIRE( db->get_account( "alice" ).delegated_vesting_share_balance == ASSET( "10000000.000000 VESTS"));
+      BOOST_REQUIRE( db->get_account( "bob" ).received_vesting_share_balance == ASSET( "10000000.000000 VESTS"));
 
       generate_block();
 
@@ -921,8 +916,8 @@ BOOST_AUTO_TEST_CASE( fix_issue_971_vesting_removal )
       db->push_transaction( tx, 0 );
       generate_block();
 
-      BOOST_REQUIRE( alice.delegated_vesting_share_balance == ASSET( "10000000.000000 VESTS"));
-      BOOST_REQUIRE( bob.received_vesting_share_balance == ASSET( "0.000000 VESTS"));
+      BOOST_REQUIRE( db->get_account( "alice" ).delegated_vesting_share_balance == ASSET( "10000000.000000 VESTS"));
+      BOOST_REQUIRE( db->get_account( "bob" ).received_vesting_share_balance == ASSET( "0.000000 VESTS"));
    }
    FC_LOG_AND_RETHROW()
 }

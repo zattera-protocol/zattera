@@ -3487,10 +3487,10 @@ void database::clear_expired_delegations()
    {
       modify( get_account( itr->delegator ), [&]( account_object& a )
       {
-         a.delegated_vesting_share_balance -= itr->vesting_share_balance;
+         a.delegated_vesting_share_balance -= itr->vesting_shares;
       });
 
-      push_virtual_operation( return_vesting_delegation_operation( itr->delegator, itr->vesting_share_balance ) );
+      push_virtual_operation( return_vesting_delegation_operation( itr->delegator, itr->vesting_shares ) );
 
       remove( *itr );
       itr = delegations_by_exp.begin();
