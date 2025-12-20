@@ -146,9 +146,9 @@ BOOST_AUTO_TEST_CASE( apply_reward_balance_claim )
       generate_block();
       validate_database();
 
-      auto alice_liquid = db->get_account( "alice" ).liquid_balance;
-      auto alice_dollar = db->get_account( "alice" ).dollar_balance;
-      auto alice_vests = db->get_account( "alice" ).vesting_shares;
+      auto alice_liquid_balance = db->get_account( "alice" ).liquid_balance;
+      auto alice_dollar_balance = db->get_account( "alice" ).dollar_balance;
+      auto alice_vests_balance = db->get_account( "alice" ).vesting_share_balance;
 
 
       BOOST_TEST_MESSAGE( "--- Attempting to claim more ZTR than exists in the reward balance." );
@@ -176,16 +176,16 @@ BOOST_AUTO_TEST_CASE( apply_reward_balance_claim )
       tx.sign( alice_private_key, db->get_chain_id() );
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == alice_liquid + op.reward_liquids );
+      BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == alice_liquid_balance + op.reward_liquids );
       BOOST_REQUIRE( db->get_account( "alice" ).reward_liquid_balance == ASSET( "10.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( "alice" ).dollar_balance == alice_dollar + op.reward_dollars );
+      BOOST_REQUIRE( db->get_account( "alice" ).dollar_balance == alice_dollar_balance + op.reward_dollars );
       BOOST_REQUIRE( db->get_account( "alice" ).reward_dollar_balance == ASSET( "10.000 TBD" ) );
-      BOOST_REQUIRE( db->get_account( "alice" ).vesting_shares == alice_vests + op.reward_vests );
+      BOOST_REQUIRE( db->get_account( "alice" ).vesting_share_balance == alice_vests_balance + op.reward_vests );
       BOOST_REQUIRE( db->get_account( "alice" ).reward_vesting_share_balance == ASSET( "5.000000 VESTS" ) );
       BOOST_REQUIRE( db->get_account( "alice" ).reward_vesting_liquid_balance == ASSET( "5.000 TTR" ) );
       validate_database();
 
-      alice_vests += op.reward_vests;
+      alice_vests_balance += op.reward_vests;
 
 
       BOOST_TEST_MESSAGE( "--- Claiming the full reward balance" );
@@ -199,9 +199,9 @@ BOOST_AUTO_TEST_CASE( apply_reward_balance_claim )
 
       BOOST_REQUIRE( db->get_account( "alice" ).liquid_balance == alice_liquid + op.reward_liquids );
       BOOST_REQUIRE( db->get_account( "alice" ).reward_liquid_balance == ASSET( "0.000 TTR" ) );
-      BOOST_REQUIRE( db->get_account( "alice" ).dollar_balance == alice_dollar + op.reward_dollars );
+      BOOST_REQUIRE( db->get_account( "alice" ).dollar_balance == alice_dollar_balance + op.reward_dollars );
       BOOST_REQUIRE( db->get_account( "alice" ).reward_dollar_balance == ASSET( "0.000 TBD" ) );
-      BOOST_REQUIRE( db->get_account( "alice" ).vesting_shares == alice_vests + op.reward_vests );
+      BOOST_REQUIRE( db->get_account( "alice" ).vesting_share_balance == alice_vests_balance + op.reward_vests );
       BOOST_REQUIRE( db->get_account( "alice" ).reward_vesting_share_balance == ASSET( "0.000000 VESTS" ) );
       BOOST_REQUIRE( db->get_account( "alice" ).reward_vesting_liquid_balance == ASSET( "0.000 TTR" ) );
             validate_database();

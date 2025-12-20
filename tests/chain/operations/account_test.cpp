@@ -121,7 +121,7 @@ BOOST_AUTO_TEST_CASE( apply_account_creation )
       BOOST_REQUIRE( acct.id._id == acct_auth.id._id );
 
       /// because init_witness has created vesting shares and blocks have been produced, 100 ZTR is worth less than 100 vesting shares due to rounding
-      BOOST_REQUIRE( acct.vesting_shares.amount.value == ( op.fee * ( vest_shares / vests ) ).amount.value );
+      BOOST_REQUIRE( acct.vesting_share_balance.amount.value == ( op.fee * ( vest_shares / vests ) ).amount.value );
       BOOST_REQUIRE( acct.vesting_withdraw_rate.amount.value == ASSET( "0.000000 VESTS" ).amount.value );
       BOOST_REQUIRE( acct.proxied_vsf_votes_total().value == 0 );
       BOOST_REQUIRE( ( init_starting_balance - ASSET( "0.100 TTR" ) ).amount.value == init.liquid_balance.amount.value );
@@ -138,7 +138,7 @@ BOOST_AUTO_TEST_CASE( apply_account_creation )
       BOOST_REQUIRE( acct.created == db->head_block_time() );
       BOOST_REQUIRE( acct.liquid_balance.amount.value == ASSET( "0.000 TTR " ).amount.value );
       BOOST_REQUIRE( acct.dollar_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
-      BOOST_REQUIRE( acct.vesting_shares.amount.value == ( op.fee * ( vest_shares / vests ) ).amount.value );
+      BOOST_REQUIRE( acct.vesting_share_balance.amount.value == ( op.fee * ( vest_shares / vests ) ).amount.value );
       BOOST_REQUIRE( acct.vesting_withdraw_rate.amount.value == ASSET( "0.000000 VESTS" ).amount.value );
       BOOST_REQUIRE( acct.proxied_vsf_votes_total().value == 0 );
       BOOST_REQUIRE( ( init_starting_balance - ASSET( "0.100 TTR" ) ).amount.value == init.liquid_balance.amount.value );
@@ -469,7 +469,7 @@ BOOST_AUTO_TEST_CASE( apply_account_witness_vote )
 
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( sam_witness.votes == alice.vesting_shares.amount );
+      BOOST_REQUIRE( sam_witness.votes == alice.vesting_share_balance.amount );
       BOOST_REQUIRE( witness_vote_idx.find( std::make_tuple( sam_witness.owner, alice.name ) ) != witness_vote_idx.end() );
       validate_database();
 
@@ -501,7 +501,7 @@ BOOST_AUTO_TEST_CASE( apply_account_witness_vote )
 
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( sam_witness.votes == ( bob.proxied_vsf_votes_total() + bob.vesting_shares.amount ) );
+      BOOST_REQUIRE( sam_witness.votes == ( bob.proxied_vsf_votes_total() + bob.vesting_share_balance.amount ) );
       BOOST_REQUIRE( witness_vote_idx.find( std::make_tuple( sam_witness.owner, bob.name ) ) != witness_vote_idx.end() );
       BOOST_REQUIRE( witness_vote_idx.find( std::make_tuple( sam_witness.owner, alice.name ) ) == witness_vote_idx.end() );
 
@@ -513,7 +513,7 @@ BOOST_AUTO_TEST_CASE( apply_account_witness_vote )
       tx.sign( alice_private_key, db->get_chain_id() );
       ZATTERA_REQUIRE_THROW( db->push_transaction( tx, database::skip_transaction_dupe_check ), fc::exception );
 
-      BOOST_REQUIRE( sam_witness.votes == ( bob.proxied_vsf_votes_total() + bob.vesting_shares.amount ) );
+      BOOST_REQUIRE( sam_witness.votes == ( bob.proxied_vsf_votes_total() + bob.vesting_share_balance.amount ) );
       BOOST_REQUIRE( witness_vote_idx.find( std::make_tuple( sam_witness.owner, bob.name ) ) != witness_vote_idx.end() );
       BOOST_REQUIRE( witness_vote_idx.find( std::make_tuple( sam_witness.owner, alice.name ) ) == witness_vote_idx.end() );
 
@@ -649,7 +649,7 @@ BOOST_AUTO_TEST_CASE( apply_account_witness_proxy )
       BOOST_REQUIRE( bob.proxy == "alice" );
       BOOST_REQUIRE( bob.proxied_vsf_votes_total().value == 0 );
       BOOST_REQUIRE( alice.proxy == ZATTERA_PROXY_TO_SELF_ACCOUNT );
-      BOOST_REQUIRE( alice.proxied_vsf_votes_total() == bob.vesting_shares.amount );
+      BOOST_REQUIRE( alice.proxied_vsf_votes_total() == bob.vesting_share_balance.amount );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test changing proxy" );
@@ -667,7 +667,7 @@ BOOST_AUTO_TEST_CASE( apply_account_witness_proxy )
       BOOST_REQUIRE( bob.proxied_vsf_votes_total().value == 0 );
       BOOST_REQUIRE( alice.proxied_vsf_votes_total().value == 0 );
       BOOST_REQUIRE( sam.proxy == ZATTERA_PROXY_TO_SELF_ACCOUNT );
-      BOOST_REQUIRE( sam.proxied_vsf_votes_total().value == bob.vesting_shares.amount );
+      BOOST_REQUIRE( sam.proxied_vsf_votes_total().value == bob.vesting_share_balance.amount );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test failure when changing proxy to existing proxy" );
@@ -677,7 +677,7 @@ BOOST_AUTO_TEST_CASE( apply_account_witness_proxy )
       BOOST_REQUIRE( bob.proxy == "sam" );
       BOOST_REQUIRE( bob.proxied_vsf_votes_total().value == 0 );
       BOOST_REQUIRE( sam.proxy == ZATTERA_PROXY_TO_SELF_ACCOUNT );
-      BOOST_REQUIRE( sam.proxied_vsf_votes_total() == bob.vesting_shares.amount );
+      BOOST_REQUIRE( sam.proxied_vsf_votes_total() == bob.vesting_share_balance.amount );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test adding a grandparent proxy" );
@@ -695,9 +695,9 @@ BOOST_AUTO_TEST_CASE( apply_account_witness_proxy )
       BOOST_REQUIRE( bob.proxy == "sam" );
       BOOST_REQUIRE( bob.proxied_vsf_votes_total().value == 0 );
       BOOST_REQUIRE( sam.proxy == "dave" );
-      BOOST_REQUIRE( sam.proxied_vsf_votes_total() == bob.vesting_shares.amount );
+      BOOST_REQUIRE( sam.proxied_vsf_votes_total() == bob.vesting_share_balance.amount );
       BOOST_REQUIRE( dave.proxy == ZATTERA_PROXY_TO_SELF_ACCOUNT );
-      BOOST_REQUIRE( dave.proxied_vsf_votes_total() == ( sam.vesting_shares + bob.vesting_shares ).amount );
+      BOOST_REQUIRE( dave.proxied_vsf_votes_total() == ( sam.vesting_share_balance + bob.vesting_share_balance ).amount );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test adding a grandchild proxy" );
@@ -719,9 +719,9 @@ BOOST_AUTO_TEST_CASE( apply_account_witness_proxy )
       BOOST_REQUIRE( bob.proxy == "sam" );
       BOOST_REQUIRE( bob.proxied_vsf_votes_total().value == 0 );
       BOOST_REQUIRE( sam.proxy == "dave" );
-      BOOST_REQUIRE( sam.proxied_vsf_votes_total() == ( bob.vesting_shares + alice.vesting_shares ).amount );
+      BOOST_REQUIRE( sam.proxied_vsf_votes_total() == ( bob.vesting_share_balance + alice.vesting_share_balance ).amount );
       BOOST_REQUIRE( dave.proxy == ZATTERA_PROXY_TO_SELF_ACCOUNT );
-      BOOST_REQUIRE( dave.proxied_vsf_votes_total() == ( sam.vesting_shares + bob.vesting_shares + alice.vesting_shares ).amount );
+      BOOST_REQUIRE( dave.proxied_vsf_votes_total() == ( sam.vesting_share_balance + bob.vesting_share_balance + alice.vesting_share_balance ).amount );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test removing a grandchild proxy" );
@@ -741,9 +741,9 @@ BOOST_AUTO_TEST_CASE( apply_account_witness_proxy )
       BOOST_REQUIRE( bob.proxy == ZATTERA_PROXY_TO_SELF_ACCOUNT );
       BOOST_REQUIRE( bob.proxied_vsf_votes_total().value == 0 );
       BOOST_REQUIRE( sam.proxy == "dave" );
-      BOOST_REQUIRE( sam.proxied_vsf_votes_total() == alice.vesting_shares.amount );
+      BOOST_REQUIRE( sam.proxied_vsf_votes_total() == alice.vesting_share_balance.amount );
       BOOST_REQUIRE( dave.proxy == ZATTERA_PROXY_TO_SELF_ACCOUNT );
-      BOOST_REQUIRE( dave.proxied_vsf_votes_total() == ( sam.vesting_shares + alice.vesting_shares ).amount );
+      BOOST_REQUIRE( dave.proxied_vsf_votes_total() == ( sam.vesting_share_balance + alice.vesting_share_balance ).amount );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test votes are transferred when a proxy is added" );
@@ -766,7 +766,7 @@ BOOST_AUTO_TEST_CASE( apply_account_witness_proxy )
 
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_witness( ZATTERA_GENESIS_WITNESS_NAME ).votes == ( alice.vesting_shares + bob.vesting_shares ).amount );
+      BOOST_REQUIRE( db->get_witness( ZATTERA_GENESIS_WITNESS_NAME ).votes == ( alice.vesting_share_balance + bob.vesting_share_balance ).amount );
       validate_database();
 
       BOOST_TEST_MESSAGE( "--- Test votes are removed when a proxy is removed" );
@@ -778,7 +778,7 @@ BOOST_AUTO_TEST_CASE( apply_account_witness_proxy )
 
       db->push_transaction( tx, 0 );
 
-      BOOST_REQUIRE( db->get_witness( ZATTERA_GENESIS_WITNESS_NAME ).votes == bob.vesting_shares.amount );
+      BOOST_REQUIRE( db->get_witness( ZATTERA_GENESIS_WITNESS_NAME ).votes == bob.vesting_share_balance.amount );
       validate_database();
    }
    FC_LOG_AND_RETHROW()
@@ -1014,7 +1014,7 @@ BOOST_AUTO_TEST_CASE( clear_null_account )
 
       BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).liquid_balance == ASSET( "1.000 TTR" ) );
       BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).dollar_balance == ASSET( "2.000 TBD" ) );
-      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).vesting_shares > ASSET( "0.000000 VESTS" ) );
+      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).vesting_share_balance > ASSET( "0.000000 VESTS" ) );
       BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).savings_liquid_balance == ASSET( "4.000 TTR" ) );
       BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).savings_dollar_balance == ASSET( "5.000 TBD" ) );
       BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).reward_dollar_balance == ASSET( "1.000 TBD" ) );
@@ -1030,7 +1030,7 @@ BOOST_AUTO_TEST_CASE( clear_null_account )
 
       BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).liquid_balance == ASSET( "0.000 TTR" ) );
       BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).dollar_balance == ASSET( "0.000 TBD" ) );
-      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).vesting_shares == ASSET( "0.000000 VESTS" ) );
+      BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).vesting_share_balance == ASSET( "0.000000 VESTS" ) );
       BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).savings_liquid_balance == ASSET( "0.000 TTR" ) );
       BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).savings_dollar_balance == ASSET( "0.000 TBD" ) );
       BOOST_REQUIRE( db->get_account( ZATTERA_NULL_ACCOUNT ).reward_dollar_balance == ASSET( "0.000 TBD" ) );
@@ -1768,7 +1768,7 @@ BOOST_AUTO_TEST_CASE( apply_claimed_account_creation )
       BOOST_REQUIRE( bob.created == db->head_block_time() );
       BOOST_REQUIRE( bob.liquid_balance.amount.value == ASSET( "0.000 TTR" ).amount.value );
       BOOST_REQUIRE( bob.dollar_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
-      BOOST_REQUIRE( bob.vesting_shares.amount.value == ASSET( "0.000000 VESTS" ).amount.value );
+      BOOST_REQUIRE( bob.vesting_share_balance.amount.value == ASSET( "0.000000 VESTS" ).amount.value );
       BOOST_REQUIRE( bob.id._id == bob_auth.id._id );
 
       BOOST_REQUIRE( db->get_account( "alice" ).pending_claimed_accounts == 1 );
