@@ -73,8 +73,8 @@ if [[ ! -d $HOME/blockchain ]]; then
     if [[ -e /var/cache/zatterad/blocks.tbz2 ]]; then
         # init with blockchain cached in image
         ARGS+=" --replay-blockchain"
-        mkdir -p $HOME/blockchain/database
-        cd $HOME/blockchain/database
+        mkdir -p $HOME/blockchain
+        cd $HOME/blockchain
         tar xvjpf /var/cache/zatterad/blocks.tbz2
         chown -R zatterad:zatterad $HOME/blockchain
     fi
