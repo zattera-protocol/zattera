@@ -57,7 +57,7 @@ namespace zattera { namespace protocol {
 
    struct interest_operation : public virtual_operation
    {
-      interest_operation( const string& o = "", const asset& i = asset(0,ZBD_SYMBOL) )
+      interest_operation( const string& o = "", const asset& i = asset(0,DOLLAR_SYMBOL) )
          :owner(o),interest(i){}
 
       account_name_type owner;

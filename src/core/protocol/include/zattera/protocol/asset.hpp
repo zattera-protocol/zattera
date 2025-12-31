@@ -14,7 +14,7 @@ namespace zattera { namespace protocol {
          :amount(a),symbol(id){}
 
       asset()
-         :amount(0),symbol(ZTR_SYMBOL){}
+         :amount(0),symbol(LIQUID_SYMBOL){}
 
       share_type        amount;
       asset_symbol_type symbol;

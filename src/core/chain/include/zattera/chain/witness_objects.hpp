@@ -31,14 +31,14 @@ namespace zattera { namespace chain {
        *  ability to vote and make transactions.
        */
       asset             account_creation_fee =
-         asset( ZATTERA_MIN_ACCOUNT_CREATION_FEE, ZTR_SYMBOL );
+         asset( ZATTERA_MIN_ACCOUNT_CREATION_FEE, LIQUID_SYMBOL );
 
       /**
        *  This witnesses vote for the maximum_block_size which is used by the network
        *  to tune rate limiting and capacity
        */
       uint32_t          maximum_block_size = ZATTERA_MIN_BLOCK_SIZE_LIMIT * 2;
-      uint16_t          dollar_interest_rate  = ZATTERA_DEFAULT_ZBD_INTEREST_RATE;
+      uint16_t          dollar_interest_rate  = ZATTERA_DEFAULT_DOLLAR_INTEREST_RATE;
       uint32_t          account_subsidy_limit = 0;
    };
 

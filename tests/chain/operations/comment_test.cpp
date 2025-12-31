@@ -1054,11 +1054,11 @@ BOOST_AUTO_TEST_CASE( handle_comment_payout_dust )
       auto bob_vests_balance = db->get_account( "bob" ).vesting_share_balance;
       auto bob_dollar_balance = db->get_account( "bob" ).dollar_balance;
 
-      auto bob_comment_payout = asset( ( ( uint128_t( bob_comment_rshares.value ) * bob_comment_rshares.value * reward_liquids.amount.value ) / total_rshares2 ).to_uint64(), ZTR_SYMBOL );
-      auto bob_comment_discussion_rewards = asset( bob_comment_payout.amount / 4, ZTR_SYMBOL );
+      auto bob_comment_payout = asset( ( ( uint128_t( bob_comment_rshares.value ) * bob_comment_rshares.value * reward_liquids.amount.value ) / total_rshares2 ).to_uint64(), LIQUID_SYMBOL );
+      auto bob_comment_discussion_rewards = asset( bob_comment_payout.amount / 4, LIQUID_SYMBOL );
       bob_comment_payout -= bob_comment_discussion_rewards;
-      auto bob_comment_dollar_reward = db->to_dollar( asset( bob_comment_payout.amount / 2, ZTR_SYMBOL ) );
-      auto bob_comment_vesting_reward = ( bob_comment_payout - asset( bob_comment_payout.amount / 2, ZTR_SYMBOL) ) * db->get_dynamic_global_properties().get_vesting_share_price();
+      auto bob_comment_dollar_reward = db->to_dollar( asset( bob_comment_payout.amount / 2, LIQUID_SYMBOL ) );
+      auto bob_comment_vesting_reward = ( bob_comment_payout - asset( bob_comment_payout.amount / 2, LIQUID_SYMBOL) ) * db->get_dynamic_global_properties().get_vesting_share_price();
 
       BOOST_TEST_MESSAGE( "Cause first payout" );
 
@@ -1265,17 +1265,17 @@ BOOST_AUTO_TEST_CASE( process_comment_payout )
       auto sam_vests_balance = db->get_account( "sam" ).vesting_share_balance;
       auto dave_vests_balance = db->get_account( "dave" ).vesting_share_balance;
 
-      auto bob_comment_payout = asset( ( ( uint128_t( bob_comment_rshares.value ) * bob_comment_rshares.value * reward_liquids.amount.value ) / total_rshares2 ).to_uint64(), ZTR_SYMBOL );
-      auto bob_comment_vote_rewards = asset( bob_comment_payout.amount / 2, ZTR_SYMBOL );
+      auto bob_comment_payout = asset( ( ( uint128_t( bob_comment_rshares.value ) * bob_comment_rshares.value * reward_liquids.amount.value ) / total_rshares2 ).to_uint64(), LIQUID_SYMBOL );
+      auto bob_comment_vote_rewards = asset( bob_comment_payout.amount / 2, LIQUID_SYMBOL );
       bob_comment_payout -= bob_comment_vote_rewards;
-      auto bob_comment_dollar_reward = asset( bob_comment_payout.amount / 2, ZTR_SYMBOL ) * exchange_rate;
-      auto bob_comment_vesting_reward = ( bob_comment_payout - asset( bob_comment_payout.amount / 2, ZTR_SYMBOL ) ) * db->get_dynamic_global_properties().get_vesting_share_price();
+      auto bob_comment_dollar_reward = asset( bob_comment_payout.amount / 2, LIQUID_SYMBOL ) * exchange_rate;
+      auto bob_comment_vesting_reward = ( bob_comment_payout - asset( bob_comment_payout.amount / 2, LIQUID_SYMBOL ) ) * db->get_dynamic_global_properties().get_vesting_share_price();
       auto unclaimed_payments = bob_comment_vote_rewards;
-      auto alice_vote_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "bob", string( "test" ).id, db->get_account( "alice" ) ).id ) )->weight ) * bob_comment_vote_rewards.amount.value ) / bob_comment_vote_total ), ZTR_SYMBOL );
+      auto alice_vote_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "bob", string( "test" ).id, db->get_account( "alice" ) ).id ) )->weight ) * bob_comment_vote_rewards.amount.value ) / bob_comment_vote_total ), LIQUID_SYMBOL );
       auto alice_vote_vesting = alice_vote_reward * db->get_dynamic_global_properties().get_vesting_share_price();
-      auto bob_vote_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "bob", string( "test" ).id, db->get_account( "bob" ) ).id ) )->weight ) * bob_comment_vote_rewards.amount.value ) / bob_comment_vote_total ), ZTR_SYMBOL );
+      auto bob_vote_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "bob", string( "test" ).id, db->get_account( "bob" ) ).id ) )->weight ) * bob_comment_vote_rewards.amount.value ) / bob_comment_vote_total ), LIQUID_SYMBOL );
       auto bob_vote_vesting = bob_vote_reward * db->get_dynamic_global_properties().get_vesting_share_price();
-      auto sam_vote_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "bob", string( "test" ).id, db->get_account( "sam" ) ).id ) )->weight ) * bob_comment_vote_rewards.amount.value ) / bob_comment_vote_total ), ZTR_SYMBOL );
+      auto sam_vote_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "bob", string( "test" ).id, db->get_account( "sam" ) ).id ) )->weight ) * bob_comment_vote_rewards.amount.value ) / bob_comment_vote_total ), LIQUID_SYMBOL );
       auto sam_vote_vesting = sam_vote_reward * db->get_dynamic_global_properties().get_vesting_share_price();
       unclaimed_payments -= ( alice_vote_reward + bob_vote_reward + sam_vote_reward );
 
@@ -1340,19 +1340,19 @@ BOOST_AUTO_TEST_CASE( process_comment_payout )
       trs2 = ( trs2 << 64 ) + total_rshares2.lo;
       auto rs2 = rs*rs;
 
-      auto alice_comment_payout = asset( static_cast< uint64_t >( ( rf * rs2 ) / trs2 ), ZTR_SYMBOL );
-      auto alice_comment_vote_rewards = asset( alice_comment_payout.amount / 2, ZTR_SYMBOL );
+      auto alice_comment_payout = asset( static_cast< uint64_t >( ( rf * rs2 ) / trs2 ), LIQUID_SYMBOL );
+      auto alice_comment_vote_rewards = asset( alice_comment_payout.amount / 2, LIQUID_SYMBOL );
       alice_comment_payout -= alice_comment_vote_rewards;
-      auto alice_comment_dollar_reward = asset( alice_comment_payout.amount / 2, ZTR_SYMBOL ) * exchange_rate;
-      auto alice_comment_vesting_reward = ( alice_comment_payout - asset( alice_comment_payout.amount / 2, ZTR_SYMBOL ) ) * db->get_dynamic_global_properties().get_vesting_share_price();
+      auto alice_comment_dollar_reward = asset( alice_comment_payout.amount / 2, LIQUID_SYMBOL ) * exchange_rate;
+      auto alice_comment_vesting_reward = ( alice_comment_payout - asset( alice_comment_payout.amount / 2, LIQUID_SYMBOL ) ) * db->get_dynamic_global_properties().get_vesting_share_price();
       unclaimed_payments = alice_comment_vote_rewards;
-      alice_vote_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "alice", string( "test" ).id, db->get_account( "alice" ) ).id ) )->weight ) * alice_comment_vote_rewards.amount.value ) / alice_comment_vote_total ), ZTR_SYMBOL );
+      alice_vote_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "alice", string( "test" ).id, db->get_account( "alice" ) ).id ) )->weight ) * alice_comment_vote_rewards.amount.value ) / alice_comment_vote_total ), LIQUID_SYMBOL );
       alice_vote_vesting = alice_vote_reward * db->get_dynamic_global_properties().get_vesting_share_price();
-      bob_vote_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "alice", string( "test" ).id, db->get_account( "bob" ) ).id ) )->weight ) * alice_comment_vote_rewards.amount.value ) / alice_comment_vote_total ), ZTR_SYMBOL );
+      bob_vote_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "alice", string( "test" ).id, db->get_account( "bob" ) ).id ) )->weight ) * alice_comment_vote_rewards.amount.value ) / alice_comment_vote_total ), LIQUID_SYMBOL );
       bob_vote_vesting = bob_vote_reward * db->get_dynamic_global_properties().get_vesting_share_price();
-      sam_vote_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "alice", string( "test" ).id, db->get_account( "sam" ) ).id ) )->weight ) * alice_comment_vote_rewards.amount.value ) / alice_comment_vote_total ), ZTR_SYMBOL );
+      sam_vote_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "alice", string( "test" ).id, db->get_account( "sam" ) ).id ) )->weight ) * alice_comment_vote_rewards.amount.value ) / alice_comment_vote_total ), LIQUID_SYMBOL );
       sam_vote_vesting = sam_vote_reward * db->get_dynamic_global_properties().get_vesting_share_price();
-      auto dave_vote_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "alice", string( "test" ).id, db->get_account( "dave" ) ).id ) )->weight ) * alice_comment_vote_rewards.amount.value ) / alice_comment_vote_total ), ZTR_SYMBOL );
+      auto dave_vote_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "alice", string( "test" ).id, db->get_account( "dave" ) ).id ) )->weight ) * alice_comment_vote_rewards.amount.value ) / alice_comment_vote_total ), LIQUID_SYMBOL );
       auto dave_vote_vesting = dave_vote_reward * db->get_dynamic_global_properties().get_vesting_share_price();
       unclaimed_payments -= ( alice_vote_reward + bob_vote_reward + sam_vote_reward + dave_vote_reward );
 
@@ -1553,8 +1553,8 @@ BOOST_AUTO_TEST_CASE( handle_nested_comments )
       auto alice_comment_vote_rewards = alice_comment_reward / 2;
       alice_comment_reward -= alice_comment_vote_rewards;
 
-      auto alice_vote_alice_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "alice", string( "test" ).id, db->get_account( "alice" ) ).id ) )->weight ) * alice_comment_vote_rewards ) / alice_comment.total_vote_weight ), ZTR_SYMBOL );
-      auto bob_vote_alice_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "alice", string( "test" ).id, db->get_account( "bob" ) ).id ) )->weight ) * alice_comment_vote_rewards ) / alice_comment.total_vote_weight ), ZTR_SYMBOL );
+      auto alice_vote_alice_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "alice", string( "test" ).id, db->get_account( "alice" ) ).id ) )->weight ) * alice_comment_vote_rewards ) / alice_comment.total_vote_weight ), LIQUID_SYMBOL );
+      auto bob_vote_alice_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "alice", string( "test" ).id, db->get_account( "bob" ) ).id ) )->weight ) * alice_comment_vote_rewards ) / alice_comment.total_vote_weight ), LIQUID_SYMBOL );
       reward_liquids += alice_comment_vote_rewards - ( alice_vote_alice_reward + bob_vote_alice_reward ).amount.value;
 
       auto bob_comment_reward = ( ( reward_liquids * bob_comment.net_rshares.value * bob_comment.net_rshares.value ) / total_rshares2 ).to_uint64();
@@ -1563,9 +1563,9 @@ BOOST_AUTO_TEST_CASE( handle_nested_comments )
       auto bob_comment_vote_rewards = bob_comment_reward / 2;
       bob_comment_reward -= bob_comment_vote_rewards;
 
-      auto alice_vote_bob_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "bob", string( "test" ).id, db->get_account( "alice" ) ).id ) )->weight ) * bob_comment_vote_rewards ) / bob_comment.total_vote_weight ), ZTR_SYMBOL );
-      auto bob_vote_bob_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "bob", string( "test" ).id, db->get_account( "bob" ) ).id ) )->weight ) * bob_comment_vote_rewards ) / bob_comment.total_vote_weight ), ZTR_SYMBOL );
-      auto sam_vote_bob_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "bob", string( "test" ).id, db->get_account( "sam" ) ).id ) )->weight ) * bob_comment_vote_rewards ) / bob_comment.total_vote_weight ), ZTR_SYMBOL );
+      auto alice_vote_bob_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "bob", string( "test" ).id, db->get_account( "alice" ) ).id ) )->weight ) * bob_comment_vote_rewards ) / bob_comment.total_vote_weight ), LIQUID_SYMBOL );
+      auto bob_vote_bob_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "bob", string( "test" ).id, db->get_account( "bob" ) ).id ) )->weight ) * bob_comment_vote_rewards ) / bob_comment.total_vote_weight ), LIQUID_SYMBOL );
+      auto sam_vote_bob_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "bob", string( "test" ).id, db->get_account( "sam" ) ).id ) )->weight ) * bob_comment_vote_rewards ) / bob_comment.total_vote_weight ), LIQUID_SYMBOL );
       reward_liquids += bob_comment_vote_rewards - ( alice_vote_bob_reward + bob_vote_bob_reward + sam_vote_bob_reward ).amount.value;
 
       auto dave_comment_reward = ( ( reward_liquids * dave_comment.net_rshares.value * dave_comment.net_rshares.value ) / total_rshares2 ).to_uint64();
@@ -1574,7 +1574,7 @@ BOOST_AUTO_TEST_CASE( handle_nested_comments )
       auto dave_comment_vote_rewards = dave_comment_reward / 2;
       dave_comment_reward -= dave_comment_vote_rewards;
 
-      auto bob_vote_dave_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "dave", string( "test" ).id, db->get_account( "bob" ) ).id ) )->weight ) * dave_comment_vote_rewards ) / dave_comment.total_vote_weight ), ZTR_SYMBOL );
+      auto bob_vote_dave_reward = asset( static_cast< uint64_t >( ( u256( vote_idx.find( std::make_tuple( db->get_comment( "dave", string( "test" ).id, db->get_account( "bob" ) ).id ) )->weight ) * dave_comment_vote_rewards ) / dave_comment.total_vote_weight ), LIQUID_SYMBOL );
       reward_liquids += dave_comment_vote_rewards - bob_vote_dave_reward.amount.value;
 
       // Calculate rewards paid to parent posts
@@ -1604,13 +1604,13 @@ BOOST_AUTO_TEST_CASE( handle_nested_comments )
       dave_pays_bob_vests -= dave_pays_alice_vests;
 
       // Calculate total comment payouts
-      auto alice_comment_total_payout = db->to_dollar( asset( alice_pays_alice_dollar + alice_pays_alice_vests, ZTR_SYMBOL ) );
-      alice_comment_total_payout += db->to_dollar( asset( bob_pays_alice_dollar + bob_pays_alice_vests, ZTR_SYMBOL ) );
-      alice_comment_total_payout += db->to_dollar( asset( dave_pays_alice_dollar + dave_pays_alice_vests, ZTR_SYMBOL ) );
-      auto bob_comment_total_payout = db->to_dollar( asset( bob_pays_bob_dollar + bob_pays_bob_vests, ZTR_SYMBOL ) );
-      bob_comment_total_payout += db->to_dollar( asset( dave_pays_bob_dollar + dave_pays_bob_vests, ZTR_SYMBOL ) );
-      auto sam_comment_total_payout = db->to_dollar( asset( dave_pays_sam_dollar + dave_pays_sam_vests, ZTR_SYMBOL ) );
-      auto dave_comment_total_payout = db->to_dollar( asset( dave_pays_dave_dollar + dave_pays_dave_vests, ZTR_SYMBOL ) );
+      auto alice_comment_total_payout = db->to_dollar( asset( alice_pays_alice_dollar + alice_pays_alice_vests, LIQUID_SYMBOL ) );
+      alice_comment_total_payout += db->to_dollar( asset( bob_pays_alice_dollar + bob_pays_alice_vests, LIQUID_SYMBOL ) );
+      alice_comment_total_payout += db->to_dollar( asset( dave_pays_alice_dollar + dave_pays_alice_vests, LIQUID_SYMBOL ) );
+      auto bob_comment_total_payout = db->to_dollar( asset( bob_pays_bob_dollar + bob_pays_bob_vests, LIQUID_SYMBOL ) );
+      bob_comment_total_payout += db->to_dollar( asset( dave_pays_bob_dollar + dave_pays_bob_vests, LIQUID_SYMBOL ) );
+      auto sam_comment_total_payout = db->to_dollar( asset( dave_pays_sam_dollar + dave_pays_sam_vests, LIQUID_SYMBOL ) );
+      auto dave_comment_total_payout = db->to_dollar( asset( dave_pays_dave_dollar + dave_pays_dave_vests, LIQUID_SYMBOL ) );
 
       auto alice_starting_vests = db->get_account( "alice" ).vesting_share_balance;
       auto alice_starting_dollar = db->get_account( "alice" ).dollar_balance;
@@ -1739,23 +1739,23 @@ BOOST_AUTO_TEST_CASE( handle_nested_comments )
 
       BOOST_TEST_MESSAGE( "Checking account balances" );
 
-      auto alice_total_dollars = alice_starting_dollar + asset( alice_pays_alice_dollar + bob_pays_alice_dollar + dave_pays_alice_dollar, ZTR_SYMBOL ) * exchange_rate;
-      auto alice_total_vests = alice_starting_vests + asset( alice_pays_alice_vests + bob_pays_alice_vests + dave_pays_alice_vests + alice_vote_alice_reward.amount + alice_vote_bob_reward.amount, ZTR_SYMBOL ) * gpo.get_vesting_share_price();
+      auto alice_total_dollars = alice_starting_dollar + asset( alice_pays_alice_dollar + bob_pays_alice_dollar + dave_pays_alice_dollar, LIQUID_SYMBOL ) * exchange_rate;
+      auto alice_total_vests = alice_starting_vests + asset( alice_pays_alice_vests + bob_pays_alice_vests + dave_pays_alice_vests + alice_vote_alice_reward.amount + alice_vote_bob_reward.amount, LIQUID_SYMBOL ) * gpo.get_vesting_share_price();
       BOOST_REQUIRE( db->get_account( "alice" ).dollar_balance.amount.value == alice_total_dollars.amount.value );
       BOOST_REQUIRE( db->get_account( "alice" ).vesting_share_balance.amount.value == alice_total_vests.amount.value );
 
-      auto bob_total_dollars = bob_starting_dollar + asset( bob_pays_bob_dollar + dave_pays_bob_dollar, ZTR_SYMBOL ) * exchange_rate;
-      auto bob_total_vests = bob_starting_vests + asset( bob_pays_bob_vests + dave_pays_bob_vests + bob_vote_alice_reward.amount + bob_vote_bob_reward.amount + bob_vote_dave_reward.amount, ZTR_SYMBOL ) * gpo.get_vesting_share_price();
+      auto bob_total_dollars = bob_starting_dollar + asset( bob_pays_bob_dollar + dave_pays_bob_dollar, LIQUID_SYMBOL ) * exchange_rate;
+      auto bob_total_vests = bob_starting_vests + asset( bob_pays_bob_vests + dave_pays_bob_vests + bob_vote_alice_reward.amount + bob_vote_bob_reward.amount + bob_vote_dave_reward.amount, LIQUID_SYMBOL ) * gpo.get_vesting_share_price();
       BOOST_REQUIRE( db->get_account( "bob" ).dollar_balance.amount.value == bob_total_dollars.amount.value );
       BOOST_REQUIRE( db->get_account( "bob" ).vesting_share_balance.amount.value == bob_total_vests.amount.value );
 
-      auto sam_total_dollars = sam_starting_dollar + asset( dave_pays_sam_dollar, ZTR_SYMBOL ) * exchange_rate;
-      auto sam_total_vests = bob_starting_vests + asset( dave_pays_sam_vests + sam_vote_bob_reward.amount, ZTR_SYMBOL ) * gpo.get_vesting_share_price();
+      auto sam_total_dollars = sam_starting_dollar + asset( dave_pays_sam_dollar, LIQUID_SYMBOL ) * exchange_rate;
+      auto sam_total_vests = bob_starting_vests + asset( dave_pays_sam_vests + sam_vote_bob_reward.amount, LIQUID_SYMBOL ) * gpo.get_vesting_share_price();
       BOOST_REQUIRE( db->get_account( "sam" ).dollar_balance.amount.value == sam_total_dollars.amount.value );
       BOOST_REQUIRE( db->get_account( "sam" ).vesting_share_balance.amount.value == sam_total_vests.amount.value );
 
-      auto dave_total_dollars = dave_starting_dollar + asset( dave_pays_dave_dollar, ZTR_SYMBOL ) * exchange_rate;
-      auto dave_total_vests = dave_starting_vests + asset( dave_pays_dave_vests, ZTR_SYMBOL ) * gpo.get_vesting_share_price();
+      auto dave_total_dollars = dave_starting_dollar + asset( dave_pays_dave_dollar, LIQUID_SYMBOL ) * exchange_rate;
+      auto dave_total_vests = dave_starting_vests + asset( dave_pays_dave_vests, LIQUID_SYMBOL ) * gpo.get_vesting_share_price();
       BOOST_REQUIRE( db->get_account( "dave" ).dollar_balance.amount.value == dave_total_dollars.amount.value );
       BOOST_REQUIRE( db->get_account( "dave" ).vesting_share_balance.amount.value == dave_total_vests.amount.value );
    }

@@ -115,7 +115,7 @@ namespace zattera { namespace protocol {
       account_name_type author;
       string            permlink;
 
-      asset             max_accepted_payout    = asset( 1000000000, ZBD_SYMBOL );       /// ZBD value of the maximum payout this post will receive
+      asset             max_accepted_payout    = asset( 1000000000, DOLLAR_SYMBOL );       /// ZBD value of the maximum payout this post will receive
       uint16_t          percent_zattera_dollars  = ZATTERA_100_PERCENT; /// the percent of Zattera Dollars to key, unkept amounts will be received as Zattera Power
       bool              allow_votes            = true;      /// allows a post to receive votes;
       bool              allow_curation_rewards = true; /// allows voters to recieve curation rewards. Rewards return to reward fund.
@@ -223,8 +223,8 @@ namespace zattera { namespace protocol {
       account_name_type agent;
       uint32_t          escrow_id = 30;
 
-      asset             dollar_amount = asset( 0, ZBD_SYMBOL );
-      asset             liquid_amount = asset( 0, ZTR_SYMBOL );
+      asset             dollar_amount = asset( 0, DOLLAR_SYMBOL );
+      asset             liquid_amount = asset( 0, LIQUID_SYMBOL );
       asset             fee;
 
       time_point_sec    ratification_deadline;
@@ -295,8 +295,8 @@ namespace zattera { namespace protocol {
       account_name_type receiver; ///< the account that should receive funds (might be from, might be to)
 
       uint32_t          escrow_id = 30;
-      asset             dollar_amount = asset( 0, ZBD_SYMBOL ); ///< the amount of zbd to release
-      asset             liquid_amount = asset( 0, ZTR_SYMBOL ); ///< the amount of ztr to release
+      asset             dollar_amount = asset( 0, DOLLAR_SYMBOL ); ///< the amount of zbd to release
+      asset             liquid_amount = asset( 0, LIQUID_SYMBOL ); ///< the amount of ztr to release
 
       void validate()const;
       void get_required_active_authorities( flat_set<account_name_type>& a )const{ a.insert(who); }
@@ -379,7 +379,7 @@ namespace zattera { namespace protocol {
        *  to tune rate limiting and capacity
        */
       uint32_t          maximum_block_size = ZATTERA_MIN_BLOCK_SIZE_LIMIT * 2;
-      uint16_t          dollar_interest_rate  = ZATTERA_DEFAULT_ZBD_INTEREST_RATE;
+      uint16_t          dollar_interest_rate  = ZATTERA_DEFAULT_DOLLAR_INTEREST_RATE;
 
       template< bool force_canon >
       void validate()const

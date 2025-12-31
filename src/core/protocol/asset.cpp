@@ -81,7 +81,7 @@ asset_symbol_type asset_symbol_type::from_nai_string( const char* p, uint8_t dec
                {
                   uint64_t new_nai = nai*10 + ((*p) - '0');
                   FC_ASSERT( new_nai >= nai, "Cannot parse asset amount" ); // This is failing for system assets
-                  FC_ASSERT( new_nai <= SMT_MAX_NAI, "Cannot parse asset amount" );
+                  FC_ASSERT( new_nai <= ZATTERA_MAX_NAI, "Cannot parse asset amount" );
                   nai = new_nai;
                   ++p;
                   ++digit_count;
@@ -172,17 +172,17 @@ uint32_t asset_symbol_type::asset_num_from_nai( uint32_t nai, uint8_t decimal_pl
    uint32_t nai_check_digit = nai % 10;
    uint32_t nai_data_digits = nai / 10;
 
-   FC_ASSERT( (nai_data_digits >= SMT_MIN_NAI) & (nai_data_digits <= SMT_MAX_NAI), "NAI out of range" );
+   FC_ASSERT( (nai_data_digits >= ZATTERA_MIN_NAI) & (nai_data_digits <= ZATTERA_MAX_NAI), "NAI out of range" );
    FC_ASSERT( nai_check_digit == damm_checksum_8digit(nai_data_digits), "Invalid check digit" );
 
    switch( nai_data_digits )
    {
-      case ZATTERA_NAI_ZTR:
-         FC_ASSERT( decimal_places == ZATTERA_PRECISION_ZTR );
-         return ZATTERA_ASSET_NUM_ZTR;
-      case ZATTERA_NAI_ZBD:
-         FC_ASSERT( decimal_places == ZATTERA_PRECISION_ZBD );
-         return ZATTERA_ASSET_NUM_ZBD;
+      case ZATTERA_NAI_LIQUID:
+         FC_ASSERT( decimal_places == ZATTERA_PRECISION_LIQUID );
+         return ZATTERA_ASSET_NUM_LIQUID;
+      case ZATTERA_NAI_DOLLAR:
+         FC_ASSERT( decimal_places == ZATTERA_PRECISION_DOLLAR );
+         return ZATTERA_ASSET_NUM_DOLLAR;
       case ZATTERA_NAI_VESTS:
          FC_ASSERT( decimal_places == ZATTERA_PRECISION_VESTS );
          return ZATTERA_ASSET_NUM_VESTS;
@@ -199,11 +199,11 @@ uint32_t asset_symbol_type::to_nai()const
    // Can be replaced with some clever bitshifting
    switch( asset_num )
    {
-      case ZATTERA_ASSET_NUM_ZTR:
-         nai_data_digits = ZATTERA_NAI_ZTR;
+      case ZATTERA_ASSET_NUM_LIQUID:
+         nai_data_digits = ZATTERA_NAI_LIQUID;
          break;
-      case ZATTERA_ASSET_NUM_ZBD:
-         nai_data_digits = ZATTERA_NAI_ZBD;
+      case ZATTERA_ASSET_NUM_DOLLAR:
+         nai_data_digits = ZATTERA_NAI_DOLLAR;
          break;
       case ZATTERA_ASSET_NUM_VESTS:
          nai_data_digits = ZATTERA_NAI_VESTS;
@@ -220,9 +220,9 @@ bool asset_symbol_type::is_vesting() const
 {
    switch( asset_num )
    {
-      case ZATTERA_ASSET_NUM_ZTR:
+      case ZATTERA_ASSET_NUM_LIQUID:
          return false;
-      case ZATTERA_ASSET_NUM_ZBD:
+      case ZATTERA_ASSET_NUM_DOLLAR:
          // ZBD is certainly liquid.
          return false;
       case ZATTERA_ASSET_NUM_VESTS:
@@ -236,12 +236,12 @@ asset_symbol_type asset_symbol_type::get_paired_symbol() const
 {
    switch( asset_num )
    {
-      case ZATTERA_ASSET_NUM_ZTR:
+      case ZATTERA_ASSET_NUM_LIQUID:
          return from_asset_num( ZATTERA_ASSET_NUM_VESTS );
-      case ZATTERA_ASSET_NUM_ZBD:
+      case ZATTERA_ASSET_NUM_DOLLAR:
          return *this;
       case ZATTERA_ASSET_NUM_VESTS:
-         return from_asset_num( ZATTERA_ASSET_NUM_ZTR );
+         return from_asset_num( ZATTERA_ASSET_NUM_LIQUID );
       default:
          FC_ASSERT( false, "Unknown asset symbol" );
    }
@@ -251,8 +251,8 @@ void asset_symbol_type::validate() const
 {
    switch( asset_num )
    {
-      case ZATTERA_ASSET_NUM_ZTR:
-      case ZATTERA_ASSET_NUM_ZBD:
+      case ZATTERA_ASSET_NUM_LIQUID:
+      case ZATTERA_ASSET_NUM_DOLLAR:
       case ZATTERA_ASSET_NUM_VESTS:
          break;
       default:
@@ -373,13 +373,13 @@ namespace fc {
                }
                switch( name_u64 )
                {
-                  case ZTR_SYMBOL_U64:
+                  case LIQUID_SYMBOL_U64:
                      FC_ASSERT( decimals == 3, "Incorrect decimal places" );
-                     asset_num = ZATTERA_ASSET_NUM_ZTR;
+                     asset_num = ZATTERA_ASSET_NUM_LIQUID;
                      break;
-                  case ZBD_SYMBOL_U64:
+                  case DOLLAR_SYMBOL_U64:
                      FC_ASSERT( decimals == 3, "Incorrect decimal places" );
-                     asset_num = ZATTERA_ASSET_NUM_ZBD;
+                     asset_num = ZATTERA_ASSET_NUM_DOLLAR;
                      break;
                   case VESTS_SYMBOL_U64:
                      FC_ASSERT( decimals == 6, "Incorrect decimal places" );

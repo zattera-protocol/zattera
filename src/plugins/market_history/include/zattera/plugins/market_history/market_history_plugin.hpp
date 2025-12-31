@@ -100,8 +100,8 @@ struct bucket_object : public object< bucket_object_type, bucket_object >
    bucket_object_details liquid;
    bucket_object_details dollars;
 
-   price high()const { return asset( dollars.high, ZBD_SYMBOL ) / asset( liquid.high, ZTR_SYMBOL ); }
-   price low()const { return asset( dollars.low, ZBD_SYMBOL ) / asset( liquid.low, ZTR_SYMBOL ); }
+   price high()const { return asset( dollars.high, DOLLAR_SYMBOL ) / asset( liquid.high, LIQUID_SYMBOL ); }
+   price low()const { return asset( dollars.low, DOLLAR_SYMBOL ) / asset( liquid.low, LIQUID_SYMBOL ); }
 };
 
 typedef oid< bucket_object > bucket_id_type;

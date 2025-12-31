@@ -48,7 +48,7 @@ BOOST_AUTO_TEST_CASE( serialize_and_deserialize_raw_operations )
       transfer_operation op;
       op.from = "alice";
       op.to = "bob";
-      op.amount = asset(100,ZTR_SYMBOL);
+      op.amount = asset(100,LIQUID_SYMBOL);
 
       trx.operations.push_back( op );
       auto packed = fc::raw::pack_to_vector( trx );
@@ -68,7 +68,7 @@ BOOST_AUTO_TEST_CASE( serialize_and_deserialize_json_operations )
       transfer_operation op;
       op.from = "alice";
       op.to = "bob";
-      op.amount = asset(100,ZTR_SYMBOL);
+      op.amount = asset(100,LIQUID_SYMBOL);
 
       fc::variant test(op.amount);
       auto tmp = test.as<asset>();
@@ -105,16 +105,16 @@ BOOST_AUTO_TEST_CASE( handle_asset_operations )
       BOOST_CHECK_EQUAL( ztr.amount.value, 123456 );
       BOOST_CHECK_EQUAL( ztr.symbol.decimals(), 3 );
       BOOST_CHECK_EQUAL( fc::json::to_string( ztr ), "{\"amount\":\"123456\",\"precision\":3,\"nai\":\"@@000000021\"}" );
-      BOOST_CHECK( ztr.symbol.asset_num == ZATTERA_ASSET_NUM_ZTR );
-      BOOST_CHECK_EQUAL( fc::json::to_string( asset( 50, ZTR_SYMBOL ) ), "{\"amount\":\"50\",\"precision\":3,\"nai\":\"@@000000021\"}" );
-      BOOST_CHECK_EQUAL( fc::json::to_string( asset( 50000, ZTR_SYMBOL ) ), "{\"amount\":\"50000\",\"precision\":3,\"nai\":\"@@000000021\"}" );
+      BOOST_CHECK( ztr.symbol.asset_num == ZATTERA_ASSET_NUM_LIQUID );
+      BOOST_CHECK_EQUAL( fc::json::to_string( asset( 50, LIQUID_SYMBOL ) ), "{\"amount\":\"50\",\"precision\":3,\"nai\":\"@@000000021\"}" );
+      BOOST_CHECK_EQUAL( fc::json::to_string( asset( 50000, LIQUID_SYMBOL ) ), "{\"amount\":\"50000\",\"precision\":3,\"nai\":\"@@000000021\"}" );
 
       BOOST_CHECK_EQUAL( zbd.amount.value, 654321 );
       BOOST_CHECK_EQUAL( zbd.symbol.decimals(), 3 );
       BOOST_CHECK_EQUAL( fc::json::to_string( zbd ), "{\"amount\":\"654321\",\"precision\":3,\"nai\":\"@@000000013\"}" );
-      BOOST_CHECK( zbd.symbol.asset_num == ZATTERA_ASSET_NUM_ZBD );
-      BOOST_CHECK_EQUAL( fc::json::to_string( asset( 50, ZBD_SYMBOL ) ), "{\"amount\":\"50\",\"precision\":3,\"nai\":\"@@000000013\"}" );
-      BOOST_CHECK_EQUAL( fc::json::to_string( asset( 50000, ZBD_SYMBOL ) ), "{\"amount\":\"50000\",\"precision\":3,\"nai\":\"@@000000013\"}" );
+      BOOST_CHECK( zbd.symbol.asset_num == ZATTERA_ASSET_NUM_DOLLAR );
+      BOOST_CHECK_EQUAL( fc::json::to_string( asset( 50, DOLLAR_SYMBOL ) ), "{\"amount\":\"50\",\"precision\":3,\"nai\":\"@@000000013\"}" );
+      BOOST_CHECK_EQUAL( fc::json::to_string( asset( 50000, DOLLAR_SYMBOL ) ), "{\"amount\":\"50000\",\"precision\":3,\"nai\":\"@@000000013\"}" );
 
       BOOST_CHECK_EQUAL( vests.amount.value, 123456789 );
       BOOST_CHECK_EQUAL( vests.symbol.decimals(), 6 );
@@ -167,13 +167,13 @@ std::string hex_bytes( const T& obj )
 
 void old_pack_symbol(vector<char>& v, asset_symbol_type sym)
 {
-   if( sym == ZTR_SYMBOL )
+   if( sym == LIQUID_SYMBOL )
    {
       v.push_back('\x03'); v.push_back('T' ); v.push_back('T' ); v.push_back('R' );
       v.push_back('\0'  ); v.push_back('\0'); v.push_back('\0'); v.push_back('\0');
       // 03 54 54 52 00 00 00 00
    }
-   else if( sym == ZBD_SYMBOL )
+   else if( sym == DOLLAR_SYMBOL )
    {
       v.push_back('\x03'); v.push_back('T' ); v.push_back('B' ); v.push_back('D' );
       v.push_back('\0'  ); v.push_back('\0'); v.push_back('\0'); v.push_back('\0');
@@ -210,7 +210,7 @@ void old_pack_asset( vector<char>& v, const asset& a )
 std::string old_json_asset( const asset& a )
 {
    size_t decimal_places = 0;
-   if( (a.symbol == ZTR_SYMBOL) || (a.symbol == ZBD_SYMBOL) )
+   if( (a.symbol == LIQUID_SYMBOL) || (a.symbol == DOLLAR_SYMBOL) )
       decimal_places = 3;
    else if( a.symbol == VESTS_SYMBOL )
       decimal_places = 6;
@@ -218,9 +218,9 @@ std::string old_json_asset( const asset& a )
    ss << std::setfill('0') << std::setw(decimal_places+1) << a.amount.value;
    std::string result = ss.str();
    result.insert( result.length() - decimal_places, 1, '.' );
-   if( a.symbol == ZTR_SYMBOL )
+   if( a.symbol == LIQUID_SYMBOL )
       result += " TTR";
-   else if( a.symbol == ZBD_SYMBOL )
+   else if( a.symbol == DOLLAR_SYMBOL )
       result += " TBD";
    else if( a.symbol == VESTS_SYMBOL )
       result += " VESTS";
@@ -233,8 +233,8 @@ BOOST_AUTO_TEST_CASE( serialize_and_deserialize_raw_assets )
 {
    try
    {
-      BOOST_CHECK( ZBD_SYMBOL < ZTR_SYMBOL );
-      BOOST_CHECK( ZTR_SYMBOL < VESTS_SYMBOL );
+      BOOST_CHECK( DOLLAR_SYMBOL < LIQUID_SYMBOL );
+      BOOST_CHECK( LIQUID_SYMBOL < VESTS_SYMBOL );
 
       // get a bunch of random bits
       fc::sha256 h = fc::sha256::hash("");
@@ -253,8 +253,8 @@ BOOST_AUTO_TEST_CASE( serialize_and_deserialize_raw_assets )
 
       std::vector< asset_symbol_type > symbols;
 
-      symbols.push_back( ZTR_SYMBOL   );
-      symbols.push_back( ZBD_SYMBOL   );
+      symbols.push_back( LIQUID_SYMBOL   );
+      symbols.push_back( DOLLAR_SYMBOL   );
       symbols.push_back( VESTS_SYMBOL );
 
       for( const share_type& amount : amounts )
@@ -463,7 +463,7 @@ BOOST_AUTO_TEST_CASE( serialize_static_variant_to_json )
       transfer_operation t = op.get< transfer_operation >();
       BOOST_CHECK( t.from == "foo" );
       BOOST_CHECK( t.to == "bar" );
-      BOOST_CHECK( t.amount == asset( 1000, ZTR_SYMBOL ) );
+      BOOST_CHECK( t.amount == asset( 1000, LIQUID_SYMBOL ) );
       BOOST_CHECK( t.memo == "" );
 
       json_str = "{\"type\":1,\"value\":{\"parent_author\":\"foo\",\"parent_permlink\":\"bar\",\"author\":\"foo1\",\"permlink\":\"bar1\",\"title\":\"\",\"body\":\"\",\"json_metadata\":\"\"}}";

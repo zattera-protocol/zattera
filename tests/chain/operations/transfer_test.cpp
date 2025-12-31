@@ -229,21 +229,21 @@ BOOST_AUTO_TEST_CASE( validate_escrow_transfer )
       op.escrow_expiration = db->head_block_time() + 200;
 
       BOOST_TEST_MESSAGE( "--- failure when zbd symbol != ZBD" );
-      op.dollar_amount.symbol = ZTR_SYMBOL;
+      op.dollar_amount.symbol = LIQUID_SYMBOL;
       ZATTERA_REQUIRE_THROW( op.validate(), fc::exception );
 
       BOOST_TEST_MESSAGE( "--- failure when ztr symbol != ZTR" );
-      op.dollar_amount.symbol = ZBD_SYMBOL;
-      op.liquid_amount.symbol = ZBD_SYMBOL;
+      op.dollar_amount.symbol = DOLLAR_SYMBOL;
+      op.liquid_amount.symbol = DOLLAR_SYMBOL;
       ZATTERA_REQUIRE_THROW( op.validate(), fc::exception );
 
       BOOST_TEST_MESSAGE( "--- failure when fee symbol != ZBD and fee symbol != ZTR" );
-      op.liquid_amount.symbol = ZTR_SYMBOL;
+      op.liquid_amount.symbol = LIQUID_SYMBOL;
       op.fee.symbol = VESTS_SYMBOL;
       ZATTERA_REQUIRE_THROW( op.validate(), fc::exception );
 
       BOOST_TEST_MESSAGE( "--- failure when zbd == 0 and ztr == 0" );
-      op.fee.symbol = ZTR_SYMBOL;
+      op.fee.symbol = LIQUID_SYMBOL;
       op.dollar_amount.amount = 0;
       op.liquid_amount.amount = 0;
       ZATTERA_REQUIRE_THROW( op.validate(), fc::exception );
@@ -1039,13 +1039,13 @@ BOOST_AUTO_TEST_CASE( validate_escrow_release )
 
 
       BOOST_TEST_MESSAGE( "--- failure when ztr is not ztr symbol" );
-      op.dollar_amount.symbol = ZBD_SYMBOL;
+      op.dollar_amount.symbol = DOLLAR_SYMBOL;
       op.liquid_amount = ASSET( "1.000 TBD" );
       ZATTERA_REQUIRE_THROW( op.validate(), fc::exception );
 
 
       BOOST_TEST_MESSAGE( "--- success" );
-      op.liquid_amount.symbol = ZTR_SYMBOL;
+      op.liquid_amount.symbol = LIQUID_SYMBOL;
       op.validate();
    }
    FC_LOG_AND_RETHROW()

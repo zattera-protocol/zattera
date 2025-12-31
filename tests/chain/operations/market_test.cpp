@@ -352,7 +352,7 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation )
       BOOST_REQUIRE( limit_order->orderid == op.orderid );
       BOOST_REQUIRE( limit_order->for_sale == op.amount_to_sell.amount );
       BOOST_REQUIRE( limit_order->sell_price == price( op.amount_to_sell / op.min_to_receive ) );
-      BOOST_REQUIRE( limit_order->get_market() == std::make_pair( ZBD_SYMBOL, ZTR_SYMBOL ) );
+      BOOST_REQUIRE( limit_order->get_market() == std::make_pair( DOLLAR_SYMBOL, LIQUID_SYMBOL ) );
       BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
       BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
       validate_database();
@@ -372,7 +372,7 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation )
       BOOST_REQUIRE( limit_order->orderid == op.orderid );
       BOOST_REQUIRE( limit_order->for_sale == 10000 );
       BOOST_REQUIRE( limit_order->sell_price == price( ASSET( "10.000 TTR" ), op.min_to_receive ) );
-      BOOST_REQUIRE( limit_order->get_market() == std::make_pair( ZBD_SYMBOL, ZTR_SYMBOL ) );
+      BOOST_REQUIRE( limit_order->get_market() == std::make_pair( DOLLAR_SYMBOL, LIQUID_SYMBOL ) );
       BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
       BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
       validate_database();
@@ -416,7 +416,7 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation )
       BOOST_REQUIRE( limit_order->orderid == op.orderid );
       BOOST_REQUIRE( limit_order->for_sale == 5000 );
       BOOST_REQUIRE( limit_order->sell_price == price( ASSET( "10.000 TTR" ), ASSET( "15.000 TBD" ) ) );
-      BOOST_REQUIRE( limit_order->get_market() == std::make_pair( ZBD_SYMBOL, ZTR_SYMBOL ) );
+      BOOST_REQUIRE( limit_order->get_market() == std::make_pair( DOLLAR_SYMBOL, LIQUID_SYMBOL ) );
       BOOST_REQUIRE( limit_order_idx.find( std::make_tuple( "bob", op.orderid ) ) == limit_order_idx.end() );
       BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
       BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "7.500 TBD" ).amount.value );
@@ -446,7 +446,7 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation )
       BOOST_REQUIRE( limit_order->orderid == 1 );
       BOOST_REQUIRE( limit_order->for_sale.value == 7500 );
       BOOST_REQUIRE( limit_order->sell_price == price( ASSET( "15.000 TBD" ), ASSET( "10.000 TTR" ) ) );
-      BOOST_REQUIRE( limit_order->get_market() == std::make_pair( ZBD_SYMBOL, ZTR_SYMBOL ) );
+      BOOST_REQUIRE( limit_order->get_market() == std::make_pair( DOLLAR_SYMBOL, LIQUID_SYMBOL ) );
       BOOST_REQUIRE( limit_order_idx.find( std::make_tuple( "alice", 1 ) ) == limit_order_idx.end() );
       BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
       BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "15.000 TBD" ).amount.value );
@@ -503,7 +503,7 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation )
       BOOST_REQUIRE( limit_order->orderid == 4 );
       BOOST_REQUIRE( limit_order->for_sale.value == 1000 );
       BOOST_REQUIRE( limit_order->sell_price == price( ASSET( "12.000 TBD" ), ASSET( "10.000 TTR" ) ) );
-      BOOST_REQUIRE( limit_order->get_market() == std::make_pair( ZBD_SYMBOL, ZTR_SYMBOL ) );
+      BOOST_REQUIRE( limit_order->get_market() == std::make_pair( DOLLAR_SYMBOL, LIQUID_SYMBOL ) );
       BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "975.000 TTR" ).amount.value );
       BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "33.500 TBD" ).amount.value );
       BOOST_REQUIRE( bob.liquid_balance.amount.value == ASSET( "25.000 TTR" ).amount.value );
@@ -551,7 +551,7 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation )
       BOOST_REQUIRE( limit_order->orderid == 5 );
       BOOST_REQUIRE( limit_order->for_sale.value == 9091 );
       BOOST_REQUIRE( limit_order->sell_price == price( ASSET( "20.000 TTR" ), ASSET( "22.000 TBD" ) ) );
-      BOOST_REQUIRE( limit_order->get_market() == std::make_pair( ZBD_SYMBOL, ZTR_SYMBOL ) );
+      BOOST_REQUIRE( limit_order->get_market() == std::make_pair( DOLLAR_SYMBOL, LIQUID_SYMBOL ) );
       BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "955.000 TTR" ).amount.value );
       BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "45.500 TBD" ).amount.value );
       BOOST_REQUIRE( bob.liquid_balance.amount.value == ASSET( "35.909 TTR" ).amount.value );
@@ -717,7 +717,7 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation2 )
       BOOST_REQUIRE( limit_order->orderid == op.orderid );
       BOOST_REQUIRE( limit_order->for_sale == op.amount_to_sell.amount );
       BOOST_REQUIRE( limit_order->sell_price == op.exchange_rate );
-      BOOST_REQUIRE( limit_order->get_market() == std::make_pair( ZBD_SYMBOL, ZTR_SYMBOL ) );
+      BOOST_REQUIRE( limit_order->get_market() == std::make_pair( DOLLAR_SYMBOL, LIQUID_SYMBOL ) );
       BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
       BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
       validate_database();
@@ -737,7 +737,7 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation2 )
       BOOST_REQUIRE( limit_order->orderid == op.orderid );
       BOOST_REQUIRE( limit_order->for_sale == 10000 );
       BOOST_REQUIRE( limit_order->sell_price == op.exchange_rate );
-      BOOST_REQUIRE( limit_order->get_market() == std::make_pair( ZBD_SYMBOL, ZTR_SYMBOL ) );
+      BOOST_REQUIRE( limit_order->get_market() == std::make_pair( DOLLAR_SYMBOL, LIQUID_SYMBOL ) );
       BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
       BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "0.000 TBD" ).amount.value );
       validate_database();
@@ -781,7 +781,7 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation2 )
       BOOST_REQUIRE( limit_order->orderid == op.orderid );
       BOOST_REQUIRE( limit_order->for_sale == 5000 );
       BOOST_REQUIRE( limit_order->sell_price == price( ASSET( "2.000 TTR" ), ASSET( "3.000 TBD" ) ) );
-      BOOST_REQUIRE( limit_order->get_market() == std::make_pair( ZBD_SYMBOL, ZTR_SYMBOL ) );
+      BOOST_REQUIRE( limit_order->get_market() == std::make_pair( DOLLAR_SYMBOL, LIQUID_SYMBOL ) );
       BOOST_REQUIRE( limit_order_idx.find( std::make_tuple( "bob", op.orderid ) ) == limit_order_idx.end() );
       BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
       BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "7.500 TBD" ).amount.value );
@@ -811,7 +811,7 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation2 )
       BOOST_REQUIRE( limit_order->orderid == 1 );
       BOOST_REQUIRE( limit_order->for_sale.value == 7500 );
       BOOST_REQUIRE( limit_order->sell_price == price( ASSET( "3.000 TBD" ), ASSET( "2.000 TTR" ) ) );
-      BOOST_REQUIRE( limit_order->get_market() == std::make_pair( ZBD_SYMBOL, ZTR_SYMBOL ) );
+      BOOST_REQUIRE( limit_order->get_market() == std::make_pair( DOLLAR_SYMBOL, LIQUID_SYMBOL ) );
       BOOST_REQUIRE( limit_order_idx.find( std::make_tuple( "alice", 1 ) ) == limit_order_idx.end() );
       BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "990.000 TTR" ).amount.value );
       BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "15.000 TBD" ).amount.value );
@@ -868,7 +868,7 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation2 )
       BOOST_REQUIRE( limit_order->orderid == 4 );
       BOOST_REQUIRE( limit_order->for_sale.value == 1000 );
       BOOST_REQUIRE( limit_order->sell_price == op.exchange_rate );
-      BOOST_REQUIRE( limit_order->get_market() == std::make_pair( ZBD_SYMBOL, ZTR_SYMBOL ) );
+      BOOST_REQUIRE( limit_order->get_market() == std::make_pair( DOLLAR_SYMBOL, LIQUID_SYMBOL ) );
       BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "975.000 TTR" ).amount.value );
       BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "33.500 TBD" ).amount.value );
       BOOST_REQUIRE( bob.liquid_balance.amount.value == ASSET( "25.000 TTR" ).amount.value );
@@ -916,7 +916,7 @@ BOOST_AUTO_TEST_CASE( apply_limit_order_creation2 )
       BOOST_REQUIRE( limit_order->orderid == 5 );
       BOOST_REQUIRE( limit_order->for_sale.value == 9091 );
       BOOST_REQUIRE( limit_order->sell_price == price( ASSET( "1.000 TTR" ), ASSET( "1.100 TBD" ) ) );
-      BOOST_REQUIRE( limit_order->get_market() == std::make_pair( ZBD_SYMBOL, ZTR_SYMBOL ) );
+      BOOST_REQUIRE( limit_order->get_market() == std::make_pair( DOLLAR_SYMBOL, LIQUID_SYMBOL ) );
       BOOST_REQUIRE( alice.liquid_balance.amount.value == ASSET( "955.000 TTR" ).amount.value );
       BOOST_REQUIRE( alice.dollar_balance.amount.value == ASSET( "45.500 TBD" ).amount.value );
       BOOST_REQUIRE( bob.liquid_balance.amount.value == ASSET( "35.909 TTR" ).amount.value );
@@ -1140,7 +1140,7 @@ BOOST_AUTO_TEST_CASE( process_convert_delay )
       tx.operations.clear();
       tx.signatures.clear();
       op.owner = "alice";
-      op.amount = asset( 2000, ZBD_SYMBOL );
+      op.amount = asset( 2000, DOLLAR_SYMBOL );
       op.requestid = 2;
       tx.operations.push_back( op );
       tx.set_expiration( db->head_block_time() + ZATTERA_MAX_TIME_UNTIL_EXPIRATION );
@@ -1201,7 +1201,7 @@ BOOST_AUTO_TEST_CASE( calculate_dollar_interest )
       auto start_time = db->get_account( "alice" ).dollar_seconds_last_update;
       auto alice_dollar = db->get_account( "alice" ).dollar_balance;
 
-      generate_blocks( db->head_block_time() + fc::seconds( ZATTERA_ZBD_INTEREST_COMPOUND_INTERVAL_SEC ), true );
+      generate_blocks( db->head_block_time() + fc::seconds( ZATTERA_DOLLAR_INTEREST_COMPOUND_INTERVAL_SEC ), true );
 
       transfer_operation transfer;
       transfer.to = "bob";
@@ -1228,7 +1228,7 @@ BOOST_AUTO_TEST_CASE( calculate_dollar_interest )
       start_time = db->get_account( "alice" ).dollar_seconds_last_update;
       alice_dollar = db->get_account( "alice" ).dollar_balance;
 
-      generate_blocks( db->head_block_time() + fc::seconds( ZATTERA_ZBD_INTEREST_COMPOUND_INTERVAL_SEC / 2 ), true );
+      generate_blocks( db->head_block_time() + fc::seconds( ZATTERA_DOLLAR_INTEREST_COMPOUND_INTERVAL_SEC / 2 ), true );
 
       tx.operations.clear();
       tx.signatures.clear();
@@ -1246,7 +1246,7 @@ BOOST_AUTO_TEST_CASE( calculate_dollar_interest )
 
       BOOST_TEST_MESSAGE( "Testing longer interest period" );
 
-      generate_blocks( db->head_block_time() + fc::seconds( ( ZATTERA_ZBD_INTEREST_COMPOUND_INTERVAL_SEC * 7 ) / 3 ), true );
+      generate_blocks( db->head_block_time() + fc::seconds( ( ZATTERA_DOLLAR_INTEREST_COMPOUND_INTERVAL_SEC * 7 ) / 3 ), true );
 
       tx.operations.clear();
       tx.signatures.clear();
@@ -1319,7 +1319,7 @@ BOOST_AUTO_TEST_CASE( maintain_dollar_stability )
 
       BOOST_TEST_MESSAGE( "Changing sam and gpo to set up market cap conditions" );
 
-      asset dollar_balance = asset( ( gpo.virtual_liquid_supply.amount * ( ZATTERA_ZBD_STOP_PERCENT + 30 ) ) / ZATTERA_100_PERCENT, ZTR_SYMBOL ) * exchange_rate;
+      asset dollar_balance = asset( ( gpo.virtual_liquid_supply.amount * ( ZATTERA_DOLLAR_STOP_PERCENT + 30 ) ) / ZATTERA_100_PERCENT, LIQUID_SYMBOL ) * exchange_rate;
       db_plugin->debug_update( [=]( database& db )
       {
          db.modify( db.get_account( "sam" ), [&]( account_object& a )
@@ -1344,7 +1344,7 @@ BOOST_AUTO_TEST_CASE( maintain_dollar_stability )
       auto comment_reward = ( gpo.total_reward_fund_liquid.amount + 2000 ) - ( ( gpo.total_reward_fund_liquid.amount + 2000 ) * 25 * ZATTERA_1_PERCENT ) / ZATTERA_100_PERCENT ;
       comment_reward /= 2;
       auto dollar_reward = ( comment_reward * gpo.dollar_print_rate ) / ZATTERA_100_PERCENT;
-      auto alice_dollar_balance = db->get_account( "alice" ).dollar_balance + db->get_account( "alice" ).reward_dollar_balance + asset( dollar_reward, ZTR_SYMBOL ) * exchange_rate;
+      auto alice_dollar_balance = db->get_account( "alice" ).dollar_balance + db->get_account( "alice" ).reward_dollar_balance + asset( dollar_reward, LIQUID_SYMBOL ) * exchange_rate;
       auto alice_liquid_balance = db->get_account( "alice" ).liquid_balance + db->get_account( "alice" ).reward_liquid_balance ;
 
       BOOST_TEST_MESSAGE( "Checking printing ZBD has slowed" );
@@ -1361,7 +1361,7 @@ BOOST_AUTO_TEST_CASE( maintain_dollar_stability )
       BOOST_TEST_MESSAGE( "Letting percent market cap fall to 2% to verify printing of ZBD turns back on" );
 
       // Get close to 1.5% for printing ZBD to start again, but not all the way
-      asset reduced_dollar_balance = asset( ( 194 * dollar_balance.amount ) / 500, ZBD_SYMBOL );
+      asset reduced_dollar_balance = asset( ( 194 * dollar_balance.amount ) / 500, DOLLAR_SYMBOL );
       db_plugin->debug_update( [=]( database& db )
       {
          db.modify( db.get_account( "sam" ), [&]( account_object& a )
@@ -1386,7 +1386,7 @@ BOOST_AUTO_TEST_CASE( maintain_dollar_stability )
       auto last_print_rate = db->get_dynamic_global_properties().dollar_print_rate;
 
       // Keep producing blocks until printing ZBD is back
-      while( ( db->get_dynamic_global_properties().current_dollar_supply * exchange_rate ).amount >= ( db->get_dynamic_global_properties().virtual_liquid_supply.amount * ZATTERA_ZBD_START_PERCENT ) / ZATTERA_100_PERCENT )
+      while( ( db->get_dynamic_global_properties().current_dollar_supply * exchange_rate ).amount >= ( db->get_dynamic_global_properties().virtual_liquid_supply.amount * ZATTERA_DOLLAR_START_PERCENT ) / ZATTERA_100_PERCENT )
       {
          auto& gpo = db->get_dynamic_global_properties();
          BOOST_REQUIRE( gpo.dollar_print_rate >= last_print_rate );
@@ -1441,7 +1441,7 @@ BOOST_AUTO_TEST_CASE( enforce_dollar_price_feed_limit )
 
       db->skip_price_feed_limit_check = false;
       const auto& gpo = db->get_dynamic_global_properties();
-      auto new_exchange_rate = price( gpo.current_dollar_supply, asset( ( ZATTERA_100_PERCENT ) * gpo.current_liquid_supply.amount, ZTR_SYMBOL ) );
+      auto new_exchange_rate = price( gpo.current_dollar_supply, asset( ( ZATTERA_100_PERCENT ) * gpo.current_liquid_supply.amount, LIQUID_SYMBOL ) );
       set_price_feed( new_exchange_rate );
       set_price_feed( new_exchange_rate );
 

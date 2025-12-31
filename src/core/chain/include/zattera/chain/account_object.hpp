@@ -50,8 +50,8 @@ namespace zattera { namespace chain {
          uint16_t          voting_power = ZATTERA_100_PERCENT;   ///< current voting power of this account, it falls after every vote
          time_point_sec    last_vote_time; ///< used to increase the voting power of this account the longer it goes without voting.
 
-         asset             liquid_balance = asset( 0, ZTR_SYMBOL );  ///< total liquid shares held by this account
-         asset             savings_liquid_balance = asset( 0, ZTR_SYMBOL );  ///< total liquid shares held by this account
+         asset             liquid_balance = asset( 0, LIQUID_SYMBOL );  ///< total liquid shares held by this account
+         asset             savings_liquid_balance = asset( 0, LIQUID_SYMBOL );  ///< total liquid shares held by this account
 
          /**
           *  Dollar Deposits pay interest based upon the interest rate set by witnesses. The purpose of these
@@ -67,13 +67,13 @@ namespace zattera { namespace chain {
           *  @defgroup dollar_data Dollar Balance Data
           */
          ///@{
-         asset             dollar_balance = asset( 0, ZBD_SYMBOL ); /// total dollars balance
+         asset             dollar_balance = asset( 0, DOLLAR_SYMBOL ); /// total dollars balance
          uint128_t         dollar_seconds; ///< total dollars * how long it has been hel
          time_point_sec    dollar_seconds_last_update; ///< the last time the dollar_seconds was updated
          time_point_sec    dollar_last_interest_payment; ///< used to pay interest at most once per month
 
 
-         asset             savings_dollar_balance = asset( 0, ZBD_SYMBOL ); /// total dollars balance
+         asset             savings_dollar_balance = asset( 0, DOLLAR_SYMBOL ); /// total dollars balance
          uint128_t         savings_dollar_seconds; ///< total dollars * how long it has been hel
          time_point_sec    savings_dollar_seconds_last_update; ///< the last time the dollar_seconds was updated
          time_point_sec    savings_dollar_last_interest_payment; ///< used to pay interest at most once per month
@@ -81,10 +81,10 @@ namespace zattera { namespace chain {
          uint8_t           savings_withdraw_requests = 0;
          ///@}
 
-         asset             reward_dollar_balance = asset( 0, ZBD_SYMBOL );
-         asset             reward_liquid_balance = asset( 0, ZTR_SYMBOL );
+         asset             reward_dollar_balance = asset( 0, DOLLAR_SYMBOL );
+         asset             reward_liquid_balance = asset( 0, LIQUID_SYMBOL );
          asset             reward_vesting_share_balance = asset( 0, VESTS_SYMBOL );
-         asset             reward_vesting_liquid_balance = asset( 0, ZTR_SYMBOL );
+         asset             reward_vesting_liquid_balance = asset( 0, LIQUID_SYMBOL );
 
          share_type        curation_rewards = 0;
          share_type        posting_rewards = 0;

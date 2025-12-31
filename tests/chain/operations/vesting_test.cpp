@@ -103,7 +103,7 @@ BOOST_AUTO_TEST_CASE( apply_transfer_to_vesting )
       BOOST_REQUIRE( alice.liquid_balance == ASSET( "10.000 TTR" ) );
 
       auto shares = asset( gpo.total_vesting_shares.amount, VESTS_SYMBOL );
-      auto vests = asset( gpo.total_vesting_fund_liquid.amount, ZTR_SYMBOL );
+      auto vests = asset( gpo.total_vesting_fund_liquid.amount, LIQUID_SYMBOL );
       auto alice_shares = alice.vesting_share_balance;
       auto bob_shares = bob.vesting_share_balance;
 
@@ -130,7 +130,7 @@ BOOST_AUTO_TEST_CASE( apply_transfer_to_vesting )
       validate_database();
 
       op.to = "bob";
-      op.amount = asset( 2000, ZTR_SYMBOL );
+      op.amount = asset( 2000, LIQUID_SYMBOL );
       tx.operations.clear();
       tx.signatures.clear();
       tx.operations.push_back( op );

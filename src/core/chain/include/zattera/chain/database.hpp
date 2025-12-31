@@ -97,8 +97,8 @@ namespace zattera { namespace chain {
          {
             fc::path data_dir;
             fc::path shared_mem_dir;
-            uint64_t initial_supply = ZATTERA_INITIAL_SUPPLY;
-            uint64_t dollar_initial_supply = ZATTERA_ZBD_INITIAL_SUPPLY;
+            uint64_t liquid_initial_supply = ZATTERA_LIQUID_INITIAL_SUPPLY;
+            uint64_t dollar_initial_supply = ZATTERA_DOLLAR_INITIAL_SUPPLY;
             uint64_t shared_file_size = 0;
             uint16_t shared_file_full_threshold = 0;
             uint16_t shared_file_scale_rate = 0;
@@ -403,7 +403,7 @@ namespace zattera { namespace chain {
          /// Reset the object graph in-memory
          void initialize_indexes();
          void init_schema();
-         void init_genesis(uint64_t initial_supply = ZATTERA_INITIAL_SUPPLY, uint64_t dollar_initial_supply = ZATTERA_ZBD_INITIAL_SUPPLY );
+         void init_genesis(uint64_t liquid_initial_supply = ZATTERA_LIQUID_INITIAL_SUPPLY, uint64_t dollar_initial_supply = ZATTERA_DOLLAR_INITIAL_SUPPLY );
 
          /**
           *  This method validates transactions without adding it to the pending state.
@@ -523,7 +523,7 @@ namespace zattera { namespace chain {
 
          uint32_t                      _last_free_gb_printed = 0;
          /// For Initial value see appropriate comment where get_smt_next_identifier is implemented.
-         uint32_t                      _next_available_nai = SMT_MIN_NON_RESERVED_NAI;
+         uint32_t                      _next_available_nai = ZATTERA_MIN_NON_RESERVED_NAI;
 
          uint16_t                      _shared_file_full_threshold = 0;
          uint16_t                      _shared_file_scale_rate = 0;

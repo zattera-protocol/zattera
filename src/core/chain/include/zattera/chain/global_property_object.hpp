@@ -38,22 +38,22 @@ namespace zattera { namespace chain {
          account_name_type current_witness;
 
 
-         asset       virtual_liquid_supply             = asset( 0, ZTR_SYMBOL );
-         asset       current_liquid_supply             = asset( 0, ZTR_SYMBOL );
-         asset       confidential_liquid_supply        = asset( 0, ZTR_SYMBOL ); ///< total asset held in confidential balances
-         asset       current_dollar_supply         = asset( 0, ZBD_SYMBOL );
-         asset       confidential_dollar_supply    = asset( 0, ZBD_SYMBOL ); ///< total asset held in confidential balances
-         asset       total_vesting_fund_liquid   = asset( 0, ZTR_SYMBOL );
-         asset       total_vesting_shares       = asset( 0, VESTS_SYMBOL );
-         asset       total_reward_fund_liquid    = asset( 0, ZTR_SYMBOL );
+         asset       virtual_liquid_supply           = asset( 0, LIQUID_SYMBOL );
+         asset       current_liquid_supply           = asset( 0, LIQUID_SYMBOL );
+         asset       confidential_liquid_supply      = asset( 0, LIQUID_SYMBOL ); ///< total asset held in confidential balances
+         asset       current_dollar_supply           = asset( 0, DOLLAR_SYMBOL );
+         asset       confidential_dollar_supply      = asset( 0, DOLLAR_SYMBOL ); ///< total asset held in confidential balances
+         asset       total_vesting_fund_liquid       = asset( 0, LIQUID_SYMBOL );
+         asset       total_vesting_shares            = asset( 0, VESTS_SYMBOL );
+         asset       total_reward_fund_liquid        = asset( 0, LIQUID_SYMBOL );
          fc::uint128 total_reward_shares2; ///< the running total of REWARD^2
          asset       pending_rewarded_vesting_shares = asset( 0, VESTS_SYMBOL );
-         asset       pending_rewarded_vesting_liquid = asset( 0, ZTR_SYMBOL );
+         asset       pending_rewarded_vesting_liquid = asset( 0, LIQUID_SYMBOL );
 
          price       get_vesting_share_price() const
          {
             if ( total_vesting_fund_liquid.amount == 0 || total_vesting_shares.amount == 0 )
-               return price ( asset( 1000, ZTR_SYMBOL ), asset( 1000000, VESTS_SYMBOL ) );
+               return price ( asset( 1000, LIQUID_SYMBOL ), asset( 1000000, VESTS_SYMBOL ) );
 
             return price( total_vesting_shares, total_vesting_fund_liquid );
          }
@@ -101,7 +101,7 @@ namespace zattera { namespace chain {
           * "wasting" voting power through spillover; any user voting faster than this rate will have
           * their votes reduced.
           */
-         uint32_t vote_power_reserve_rate = ZATTERA_INITIAL_VOTE_POWER_RATE;
+         uint32_t vote_power_reserve_rate = ZATTERA_VOTE_POWER_RESERVE_RATE;
 
          uint32_t delegation_return_period = ZATTERA_DELEGATION_RETURN_PERIOD;
    };

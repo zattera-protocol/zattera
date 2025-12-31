@@ -51,8 +51,8 @@ void open_test_database( database& db, const fc::path& dir )
    database::open_args args;
    args.data_dir = dir;
    args.shared_mem_dir = dir;
-   args.initial_supply = TEST_INITIAL_SUPPLY;
-   args.dollar_initial_supply = TEST_ZBD_INITIAL_SUPPLY;
+   args.liquid_initial_supply = TEST_LIQUID_INITIAL_SUPPLY;
+   args.dollar_initial_supply = TEST_DOLLAR_INITIAL_SUPPLY;
    args.shared_file_size = TEST_SHARED_MEM_SIZE;
    db.open( args );
 }
@@ -335,7 +335,7 @@ BOOST_AUTO_TEST_CASE( duplicate_transactions )
       transfer_operation t;
       t.from = ZATTERA_GENESIS_WITNESS_NAME;
       t.to = "alice";
-      t.amount = asset(500,ZTR_SYMBOL);
+      t.amount = asset(500,LIQUID_SYMBOL);
       trx.operations.push_back(t);
       trx.set_expiration( db1.head_block_time() + ZATTERA_MAX_TIME_UNTIL_EXPIRATION );
       trx.sign( init_account_priv_key, db1.get_chain_id() );
@@ -348,8 +348,8 @@ BOOST_AUTO_TEST_CASE( duplicate_transactions )
 
       ZATTERA_CHECK_THROW(PUSH_TX( db1, trx, skip_sigs ), fc::exception);
       ZATTERA_CHECK_THROW(PUSH_TX( db2, trx, skip_sigs ), fc::exception);
-      BOOST_CHECK_EQUAL(db1.get_balance( "alice", ZTR_SYMBOL ).amount.value, 500);
-      BOOST_CHECK_EQUAL(db2.get_balance( "alice", ZTR_SYMBOL ).amount.value, 500);
+      BOOST_CHECK_EQUAL(db1.get_balance( "alice", LIQUID_SYMBOL ).amount.value, 500);
+      BOOST_CHECK_EQUAL(db2.get_balance( "alice", LIQUID_SYMBOL ).amount.value, 500);
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -394,7 +394,7 @@ BOOST_AUTO_TEST_CASE( tapos )
       transfer_operation t;
       t.from = ZATTERA_GENESIS_WITNESS_NAME;
       t.to = "alice";
-      t.amount = asset(50,ZTR_SYMBOL);
+      t.amount = asset(50,LIQUID_SYMBOL);
       trx.operations.push_back(t);
       trx.set_expiration( db1.head_block_time() + fc::seconds(2) );
       trx.sign( init_account_priv_key, db1.get_chain_id() );
@@ -422,11 +422,11 @@ BOOST_FIXTURE_TEST_CASE( optional_tapos, clean_database_fixture )
 
       BOOST_TEST_MESSAGE( "Create transaction" );
 
-      transfer( ZATTERA_GENESIS_WITNESS_NAME, "alice", asset( 1000000, ZTR_SYMBOL ) );
+      transfer( ZATTERA_GENESIS_WITNESS_NAME, "alice", asset( 1000000, LIQUID_SYMBOL ) );
       transfer_operation op;
       op.from = "alice";
       op.to = "bob";
-      op.amount = asset(1000,ZTR_SYMBOL);
+      op.amount = asset(1000,LIQUID_SYMBOL);
       signed_transaction tx;
       tx.operations.push_back( op );
 
@@ -489,7 +489,7 @@ BOOST_FIXTURE_TEST_CASE( double_sign_check, clean_database_fixture )
    transfer_operation t;
    t.from = ZATTERA_GENESIS_WITNESS_NAME;
    t.to = "bob";
-   t.amount = asset(amount,ZTR_SYMBOL);
+   t.amount = asset(amount,LIQUID_SYMBOL);
    trx.operations.push_back(t);
    trx.set_expiration( db->head_block_time() + ZATTERA_MAX_TIME_UNTIL_EXPIRATION );
    trx.validate();
@@ -499,7 +499,7 @@ BOOST_FIXTURE_TEST_CASE( double_sign_check, clean_database_fixture )
    trx.operations.clear();
    t.from = "bob";
    t.to = ZATTERA_GENESIS_WITNESS_NAME;
-   t.amount = asset(amount,ZTR_SYMBOL);
+   t.amount = asset(amount,LIQUID_SYMBOL);
    trx.operations.push_back(t);
    trx.validate();
 
@@ -546,7 +546,7 @@ BOOST_FIXTURE_TEST_CASE( pop_block_twice, clean_database_fixture )
 
       db->get_account( ZATTERA_GENESIS_WITNESS_NAME );
       // transfer from committee account to Sam account
-      transfer( ZATTERA_GENESIS_WITNESS_NAME, "sam", asset( 100000, ZTR_SYMBOL ) );
+      transfer( ZATTERA_GENESIS_WITNESS_NAME, "sam", asset( 100000, LIQUID_SYMBOL ) );
 
       generate_block(skip_flags);
 
@@ -805,7 +805,7 @@ BOOST_FIXTURE_TEST_CASE( generate_block_size, clean_database_fixture )
       transfer_operation op;
       op.from = ZATTERA_GENESIS_WITNESS_NAME;
       op.to = ZATTERA_TEMP_ACCOUNT;
-      op.amount = asset( 1000, ZTR_SYMBOL );
+      op.amount = asset( 1000, LIQUID_SYMBOL );
 
       // Current transfer op serializes to ~31 bytes (30 for the payload + 1-byte variant tag)
       // TX overhead is roughly 7 bytes, so 2103 ops -> first tx size ~65,243 bytes

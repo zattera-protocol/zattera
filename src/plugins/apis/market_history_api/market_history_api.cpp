@@ -38,9 +38,9 @@ DEFINE_API_IMPL( market_history_api_impl, get_ticker )
 
    if( itr != bucket_idx.end() )
    {
-      auto open = ASSET_TO_REAL( asset( itr->dollars.open, ZBD_SYMBOL ) ) / ASSET_TO_REAL( asset( itr->liquid.open, ZTR_SYMBOL ) );
+      auto open = ASSET_TO_REAL( asset( itr->dollars.open, DOLLAR_SYMBOL ) ) / ASSET_TO_REAL( asset( itr->liquid.open, LIQUID_SYMBOL ) );
       itr = bucket_idx.lower_bound( boost::make_tuple( 0, _db.head_block_time() ) );
-      result.latest = ASSET_TO_REAL( asset( itr->dollars.close, ZBD_SYMBOL ) ) / ASSET_TO_REAL( asset( itr->liquid.close, ZTR_SYMBOL ) );
+      result.latest = ASSET_TO_REAL( asset( itr->dollars.close, DOLLAR_SYMBOL ) ) / ASSET_TO_REAL( asset( itr->liquid.close, LIQUID_SYMBOL ) );
       result.percent_change = ( (result.latest - open ) / open ) * 100;
    }
 
@@ -83,31 +83,31 @@ DEFINE_API_IMPL( market_history_api_impl, get_order_book )
    FC_ASSERT( args.limit <= 500 );
 
    const auto& order_idx = _db.get_index< chain::limit_order_index, chain::by_price >();
-   auto itr = order_idx.lower_bound( price::max( ZBD_SYMBOL, ZTR_SYMBOL ) );
+   auto itr = order_idx.lower_bound( price::max( DOLLAR_SYMBOL, LIQUID_SYMBOL ) );
 
    get_order_book_return result;
 
-   while( itr != order_idx.end() && itr->sell_price.base.symbol == ZBD_SYMBOL && result.bids.size() < args.limit )
+   while( itr != order_idx.end() && itr->sell_price.base.symbol == DOLLAR_SYMBOL && result.bids.size() < args.limit )
    {
       order cur;
       cur.order_price = itr->sell_price;
       cur.real_price = ASSET_TO_REAL( itr->sell_price.base ) / ASSET_TO_REAL( itr->sell_price.quote );
-      cur.liquid = ( asset( itr->for_sale, ZBD_SYMBOL ) * itr->sell_price ).amount;
+      cur.liquid = ( asset( itr->for_sale, DOLLAR_SYMBOL ) * itr->sell_price ).amount;
       cur.dollars = itr->for_sale;
       cur.created = itr->created;
       result.bids.push_back( cur );
       ++itr;
    }
 
-   itr = order_idx.lower_bound( price::max( ZTR_SYMBOL, ZBD_SYMBOL ) );
+   itr = order_idx.lower_bound( price::max( LIQUID_SYMBOL, DOLLAR_SYMBOL ) );
 
-   while( itr != order_idx.end() && itr->sell_price.base.symbol == ZTR_SYMBOL && result.asks.size() < args.limit )
+   while( itr != order_idx.end() && itr->sell_price.base.symbol == LIQUID_SYMBOL && result.asks.size() < args.limit )
    {
       order cur;
       cur.order_price = itr->sell_price;
       cur.real_price = ASSET_TO_REAL( itr->sell_price.quote ) / ASSET_TO_REAL( itr->sell_price.base );
       cur.liquid = itr->for_sale;
-      cur.dollars = ( asset( itr->for_sale, ZTR_SYMBOL ) * itr->sell_price ).amount;
+      cur.dollars = ( asset( itr->for_sale, LIQUID_SYMBOL ) * itr->sell_price ).amount;
       cur.created = itr->created;
       result.asks.push_back( cur );
       ++itr;

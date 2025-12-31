@@ -26,16 +26,16 @@ struct get_ticker_return
    double      lowest_ask = 0;
    double      highest_bid = 0;
    double      percent_change = 0;
-   asset       liquid_volume = asset( 0 , ZTR_SYMBOL );
-   asset       dollar_volume = asset( 0, ZBD_SYMBOL );
+   asset       liquid_volume = asset( 0 , LIQUID_SYMBOL );
+   asset       dollar_volume = asset( 0, DOLLAR_SYMBOL );
 };
 
 typedef void_type get_volume_args;
 
 struct get_volume_return
 {
-   asset       liquid_volume = asset( 0, ZTR_SYMBOL );
-   asset       dollar_volume = asset( 0, ZBD_SYMBOL );
+   asset       liquid_volume = asset( 0, LIQUID_SYMBOL );
+   asset       dollar_volume = asset( 0, DOLLAR_SYMBOL );
 };
 
 struct order

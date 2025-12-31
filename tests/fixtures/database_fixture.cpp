@@ -123,8 +123,8 @@ void clean_database_fixture::resize_shared_mem( uint64_t size )
       database::open_args args;
       args.data_dir = data_dir->path();
       args.shared_mem_dir = args.data_dir;
-      args.initial_supply = TEST_INITIAL_SUPPLY;
-      args.dollar_initial_supply = TEST_ZBD_INITIAL_SUPPLY;
+      args.liquid_initial_supply = TEST_LIQUID_INITIAL_SUPPLY;
+      args.dollar_initial_supply = TEST_DOLLAR_INITIAL_SUPPLY;
       args.shared_file_size = size;
       db->open( args );
    }
@@ -227,8 +227,8 @@ void database_fixture::open_database()
       database::open_args args;
       args.data_dir = data_dir->path();
       args.shared_mem_dir = args.data_dir;
-      args.initial_supply = TEST_INITIAL_SUPPLY;
-      args.dollar_initial_supply = TEST_ZBD_INITIAL_SUPPLY;
+      args.liquid_initial_supply = TEST_LIQUID_INITIAL_SUPPLY;
+      args.dollar_initial_supply = TEST_DOLLAR_INITIAL_SUPPLY;
       args.shared_file_size = 1024 * 1024 * 1024;   // 512MB file for testing (avoid OOM on long test runs)
       db->open(args);
    }
@@ -267,7 +267,7 @@ const account_object& database_fixture::account_create(
       account_create_operation op;
       op.new_account_name = name;
       op.creator = creator;
-      op.fee = asset( fee, ZTR_SYMBOL );
+      op.fee = asset( fee, LIQUID_SYMBOL );
       op.owner = authority( 1, key, 1 );
       op.active = authority( 1, key, 1 );
       op.posting = authority( 1, post_key, 1 );
@@ -331,7 +331,7 @@ const witness_object& database_fixture::witness_create(
       op.owner = owner;
       op.url = url;
       op.block_signing_key = signing_key;
-      op.fee = asset( fee, ZTR_SYMBOL );
+      op.fee = asset( fee, LIQUID_SYMBOL );
 
       trx.operations.push_back( op );
       trx.set_expiration( db->head_block_time() + ZATTERA_MAX_TIME_UNTIL_EXPIRATION );
@@ -353,7 +353,7 @@ void database_fixture::fund(
 {
    try
    {
-      transfer( ZATTERA_GENESIS_WITNESS_NAME, account_name, asset( amount, ZTR_SYMBOL ) );
+      transfer( ZATTERA_GENESIS_WITNESS_NAME, account_name, asset( amount, LIQUID_SYMBOL ) );
 
    } FC_CAPTURE_AND_RETHROW( (account_name)(amount) )
 }
@@ -369,9 +369,9 @@ void database_fixture::fund(
       {
          db.modify( db.get_account( account_name ), [&]( account_object& a )
          {
-            if( amount.symbol == ZTR_SYMBOL )
+            if( amount.symbol == LIQUID_SYMBOL )
                a.liquid_balance += amount;
-            else if( amount.symbol == ZBD_SYMBOL )
+            else if( amount.symbol == DOLLAR_SYMBOL )
             {
                a.dollar_balance += amount;
                a.dollar_seconds_last_update = db.head_block_time();
@@ -380,19 +380,19 @@ void database_fixture::fund(
 
          db.modify( db.get_dynamic_global_properties(), [&]( dynamic_global_property_object& gpo )
          {
-            if( amount.symbol == ZTR_SYMBOL )
+            if( amount.symbol == LIQUID_SYMBOL )
                gpo.current_liquid_supply += amount;
-            else if( amount.symbol == ZBD_SYMBOL )
+            else if( amount.symbol == DOLLAR_SYMBOL )
                gpo.current_dollar_supply += amount;
          });
 
-         if( amount.symbol == ZBD_SYMBOL )
+         if( amount.symbol == DOLLAR_SYMBOL )
          {
             const auto& median_feed = db.get_feed_history();
             if( median_feed.current_median_history.is_null() )
                db.modify( median_feed, [&]( feed_history_object& f )
                {
-                  f.current_median_history = price( asset( 1, ZBD_SYMBOL ), asset( 1, ZTR_SYMBOL ) );
+                  f.current_median_history = price( asset( 1, DOLLAR_SYMBOL ), asset( 1, LIQUID_SYMBOL ) );
                });
          }
 
@@ -408,14 +408,14 @@ void database_fixture::convert(
 {
    try
    {
-      if ( amount.symbol == ZTR_SYMBOL )
+      if ( amount.symbol == LIQUID_SYMBOL )
       {
          db->adjust_balance( account_name, -amount );
          db->adjust_balance( account_name, db->to_dollar( amount ) );
          db->adjust_supply( -amount );
          db->adjust_supply( db->to_dollar( amount ) );
       }
-      else if ( amount.symbol == ZBD_SYMBOL )
+      else if ( amount.symbol == DOLLAR_SYMBOL )
       {
          db->adjust_balance( account_name, -amount );
          db->adjust_balance( account_name, db->to_liquid( amount ) );
@@ -452,7 +452,7 @@ void database_fixture::vest( const string& from, const share_type& amount )
       transfer_to_vesting_operation op;
       op.from = from;
       op.to = "";
-      op.amount = asset( amount, ZTR_SYMBOL );
+      op.amount = asset( amount, LIQUID_SYMBOL );
 
       trx.operations.push_back( op );
       trx.set_expiration( db->head_block_time() + ZATTERA_MAX_TIME_UNTIL_EXPIRATION );
@@ -464,7 +464,7 @@ void database_fixture::vest( const string& from, const share_type& amount )
 
 void database_fixture::vest( const string& account, const asset& amount )
 {
-   if( amount.symbol != ZTR_SYMBOL )
+   if( amount.symbol != LIQUID_SYMBOL )
       return;
 
    db_plugin->debug_update( [=]( database& db )
@@ -771,11 +771,11 @@ zattera::protocol::asset asset_from_string( const std::string& s )
    // Determine asset symbol
    zattera::protocol::asset_symbol_type symbol;
    if (symbol_str == "TTR" || symbol_str == "ZTR") {
-      symbol = ZTR_SYMBOL;
-      FC_ASSERT( precision == ZTR_SYMBOL.decimals(), "Invalid precision for ZTR: ${p}", ("p", precision) );
+      symbol = LIQUID_SYMBOL;
+      FC_ASSERT( precision == LIQUID_SYMBOL.decimals(), "Invalid precision for ZTR: ${p}", ("p", precision) );
    } else if (symbol_str == "TBD" || symbol_str == "ZBD") {
-      symbol = ZBD_SYMBOL;
-      FC_ASSERT( precision == ZBD_SYMBOL.decimals(), "Invalid precision for ZBD: ${p}", ("p", precision) );
+      symbol = DOLLAR_SYMBOL;
+      FC_ASSERT( precision == DOLLAR_SYMBOL.decimals(), "Invalid precision for ZBD: ${p}", ("p", precision) );
    } else if (symbol_str == "VESTS") {
       symbol = VESTS_SYMBOL;
       FC_ASSERT( precision == VESTS_SYMBOL.decimals(), "Invalid precision for VESTS: ${p}", ("p", precision) );

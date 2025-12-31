@@ -86,7 +86,7 @@ For mainnet builds (`BUILD_ZATTERA_TEST_MODE=OFF`, default):
 
 **Important for Custom Chains**:
 - Modify `ZATTERA_CHAIN_ID_NAME` to make it unique (prevents replay attacks)
-- Set `ZATTERA_INITIAL_SUPPLY` if you want pre-mined tokens
+- Set `ZATTERA_LIQUID_INITIAL_SUPPLY` if you want pre-mined tokens
 - Generate your own keys for the initial witness
 
 ## Genesis Initialization Process
@@ -307,7 +307,7 @@ Witness Node 3
 
 | Parameter | Testnet | Mainnet | Description |
 |-----------|---------|---------|-------------|
-| `ZATTERA_INITIAL_SUPPLY` | 250,000,000 ZTR | 0 ZTR | Initial token supply |
+| `ZATTERA_LIQUID_INITIAL_SUPPLY` | 250,000,000 ZTR | 0 ZTR | Initial token supply |
 
 ### Witness Parameters
 
@@ -716,7 +716,7 @@ docker run -d \
 
 ### Custom Genesis Supply
 
-To change the initial token supply, modify `ZATTERA_INITIAL_SUPPLY` in `src/core/protocol/include/zattera/protocol/config.hpp` and rebuild.
+To change the initial token supply, modify `ZATTERA_LIQUID_INITIAL_SUPPLY` in `src/core/protocol/include/zattera/protocol/config.hpp` and rebuild.
 
 Example: For 1 billion initial supply instead of 250 million, change the value accordingly and run `make -j$(nproc) zatterad`.
 

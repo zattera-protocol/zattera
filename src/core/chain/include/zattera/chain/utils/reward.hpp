@@ -43,7 +43,7 @@ uint128_t evaluate_reward_curve( const uint128_t& rshares, const protocol::curve
 
 inline bool is_comment_payout_dust( const price& p, uint64_t liquid_payout )
 {
-   return to_dollar( p, asset( liquid_payout, ZTR_SYMBOL ) ) < ZATTERA_MIN_PAYOUT_ZBD;
+   return to_dollar( p, asset( liquid_payout, LIQUID_SYMBOL ) ) < ZATTERA_MIN_PAYOUT_DOLLAR;
 }
 
 } } } // zattera::chain::util

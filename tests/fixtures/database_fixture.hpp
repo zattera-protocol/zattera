@@ -18,8 +18,8 @@
 #include <array>
 #include <iostream>
 
-#define TEST_INITIAL_SUPPLY (10000000000ll)
-#define TEST_ZBD_INITIAL_SUPPLY (20000000ll)
+#define TEST_LIQUID_INITIAL_SUPPLY (10000000000ll)
+#define TEST_DOLLAR_INITIAL_SUPPLY (20000000ll)
 
 extern uint32_t test_genesis_timestamp;
 

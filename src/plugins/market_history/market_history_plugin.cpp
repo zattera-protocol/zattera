@@ -63,15 +63,15 @@ void market_history_plugin_impl::on_post_apply_operation( const operation_notifi
                b.open = open;
                b.seconds = bucket;
 
-               b.liquid.fill( ( op.open_pays.symbol == ZTR_SYMBOL ) ? op.open_pays.amount : op.current_pays.amount );
-               b.dollars.fill( ( op.open_pays.symbol == ZTR_SYMBOL ) ? op.current_pays.amount : op.open_pays.amount );
+               b.liquid.fill( ( op.open_pays.symbol == LIQUID_SYMBOL ) ? op.open_pays.amount : op.current_pays.amount );
+               b.dollars.fill( ( op.open_pays.symbol == LIQUID_SYMBOL ) ? op.current_pays.amount : op.open_pays.amount );
             });
          }
          else
          {
             _db.modify( *itr, [&]( bucket_object& b )
             {
-               if( op.open_pays.symbol == ZTR_SYMBOL )
+               if( op.open_pays.symbol == LIQUID_SYMBOL )
                {
                   b.liquid.volume += op.open_pays.amount;
                   b.liquid.close = op.open_pays.amount;

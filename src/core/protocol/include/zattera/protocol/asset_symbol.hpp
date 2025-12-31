@@ -4,50 +4,48 @@
 #include <zattera/protocol/types_fwd.hpp>
 
 #define ZATTERA_ASSET_SYMBOL_PRECISION_BITS  4
-#define SMT_MAX_NAI                          99999999
-#define SMT_MIN_NAI                          1
-#define SMT_MIN_NON_RESERVED_NAI             10000000
+#define ZATTERA_MAX_NAI                      99999999
+#define ZATTERA_MIN_NAI                      1
+#define ZATTERA_MIN_NON_RESERVED_NAI         10000000
 #define ZATTERA_ASSET_SYMBOL_NAI_LENGTH      10
 #define ZATTERA_ASSET_SYMBOL_NAI_STRING_LENGTH ( ZATTERA_ASSET_SYMBOL_NAI_LENGTH + 2 )
 
-#define ZATTERA_PRECISION_ZBD   (3)
-#define ZATTERA_PRECISION_ZTR   (3)
-#define ZATTERA_PRECISION_VESTS (6)
+#define ZATTERA_PRECISION_DOLLAR   (3)
+#define ZATTERA_PRECISION_LIQUID   (3)
+#define ZATTERA_PRECISION_VESTS    (6)
 
 // One's place is used for check digit, which means NAI 0-9 all have NAI data of 0 which is invalid
 // This space is safe to use because it would alwasys result in failure to convert from NAI
-#define ZATTERA_NAI_ZBD   (1)
-#define ZATTERA_NAI_ZTR   (2)
-#define ZATTERA_NAI_VESTS (3)
+#define ZATTERA_NAI_DOLLAR   (1)
+#define ZATTERA_NAI_LIQUID   (2)
+#define ZATTERA_NAI_VESTS    (3)
 
-#define ZATTERA_ASSET_NUM_ZBD \
-  (((SMT_MAX_NAI + ZATTERA_NAI_ZBD)   << ZATTERA_ASSET_SYMBOL_PRECISION_BITS) | ZATTERA_PRECISION_ZBD)
-#define ZATTERA_ASSET_NUM_ZTR \
-  (((SMT_MAX_NAI + ZATTERA_NAI_ZTR) << ZATTERA_ASSET_SYMBOL_PRECISION_BITS) | ZATTERA_PRECISION_ZTR)
+#define ZATTERA_ASSET_NUM_DOLLAR \
+  (((ZATTERA_MAX_NAI + ZATTERA_NAI_DOLLAR) << ZATTERA_ASSET_SYMBOL_PRECISION_BITS) | ZATTERA_PRECISION_DOLLAR)
+#define ZATTERA_ASSET_NUM_LIQUID \
+  (((ZATTERA_MAX_NAI + ZATTERA_NAI_LIQUID) << ZATTERA_ASSET_SYMBOL_PRECISION_BITS) | ZATTERA_PRECISION_LIQUID)
 #define ZATTERA_ASSET_NUM_VESTS \
-  (((SMT_MAX_NAI + ZATTERA_NAI_VESTS) << ZATTERA_ASSET_SYMBOL_PRECISION_BITS) | ZATTERA_PRECISION_VESTS)
+  (((ZATTERA_MAX_NAI + ZATTERA_NAI_VESTS)  << ZATTERA_ASSET_SYMBOL_PRECISION_BITS) | ZATTERA_PRECISION_VESTS)
 
 #ifdef IS_TEST_MODE
 
-#define VESTS_SYMBOL_U64 (uint64_t('V') | (uint64_t('E') << 8) | (uint64_t('S') << 16) | (uint64_t('T') << 24) | (uint64_t('S') << 32))
-#define ZTR_SYMBOL_U64   (uint64_t('T') | (uint64_t('T') << 8) | (uint64_t('R') << 16))
-#define ZBD_SYMBOL_U64   (uint64_t('T') | (uint64_t('B') << 8) | (uint64_t('D') << 16))
+#define VESTS_SYMBOL_U64   (uint64_t('V') | (uint64_t('E') << 8) | (uint64_t('S') << 16) | (uint64_t('T') << 24) | (uint64_t('S') << 32))
+#define LIQUID_SYMBOL_U64  (uint64_t('T') | (uint64_t('T') << 8) | (uint64_t('R') << 16))
+#define DOLLAR_SYMBOL_U64  (uint64_t('T') | (uint64_t('B') << 8) | (uint64_t('D') << 16))
 
 #else
 
-#define VESTS_SYMBOL_U64  (uint64_t('V') | (uint64_t('E') << 8) | (uint64_t('S') << 16) | (uint64_t('T') << 24) | (uint64_t('S') << 32))
-#define ZTR_SYMBOL_U64    (uint64_t('Z') | (uint64_t('T') << 8) | (uint64_t('R') << 16))
-#define ZBD_SYMBOL_U64    (uint64_t('Z') | (uint64_t('B') << 8) | (uint64_t('D') << 16))
+#define VESTS_SYMBOL_U64   (uint64_t('V') | (uint64_t('E') << 8) | (uint64_t('S') << 16) | (uint64_t('T') << 24) | (uint64_t('S') << 32))
+#define LIQUID_SYMBOL_U64  (uint64_t('Z') | (uint64_t('T') << 8) | (uint64_t('R') << 16))
+#define DOLLAR_SYMBOL_U64  (uint64_t('Z') | (uint64_t('B') << 8) | (uint64_t('D') << 16))
 
 #endif
 
-#define VESTS_SYMBOL_SER  (uint64_t(6) | (VESTS_SYMBOL_U64 << 8)) ///< VESTS|VESTS with 6 digits of precision
-#define ZTR_SYMBOL_SER    (uint64_t(3) | (ZTR_SYMBOL_U64 << 8)) ///< ZTR|TTR with 3 digits of precision
-#define ZBD_SYMBOL_SER    (uint64_t(3) | (ZBD_SYMBOL_U64 << 8)) ///< ZBD|TBD with 3 digits of precision
+#define VESTS_SYMBOL_SER   (uint64_t(6) | (VESTS_SYMBOL_U64 << 8)) ///< VESTS|VESTS with 6 digits of precision
+#define LIQUID_SYMBOL_SER  (uint64_t(3) | (LIQUID_SYMBOL_U64 << 8)) ///< ZTR|TTR with 3 digits of precision
+#define DOLLAR_SYMBOL_SER  (uint64_t(3) | (DOLLAR_SYMBOL_U64 << 8)) ///< ZBD|TBD with 3 digits of precision
 
 #define ZATTERA_ASSET_MAX_DECIMALS 12
-
-#define SMT_ASSET_NUM_VESTING_MASK     0x20
 
 namespace zattera { namespace protocol {
 
@@ -129,11 +127,11 @@ inline void pack( Stream& s, const zattera::protocol::asset_symbol_type& sym )
    uint64_t ser = 0;
    switch( sym.asset_num )
    {
-      case ZATTERA_ASSET_NUM_ZTR:
-         ser = ZTR_SYMBOL_SER;
+      case ZATTERA_ASSET_NUM_LIQUID:
+         ser = LIQUID_SYMBOL_SER;
          break;
-      case ZATTERA_ASSET_NUM_ZBD:
-         ser = ZBD_SYMBOL_SER;
+      case ZATTERA_ASSET_NUM_DOLLAR:
+         ser = DOLLAR_SYMBOL_SER;
          break;
       case ZATTERA_ASSET_NUM_VESTS:
          ser = VESTS_SYMBOL_SER;
@@ -152,15 +150,15 @@ inline void unpack( Stream& s, zattera::protocol::asset_symbol_type& sym )
 
    switch( ser )
    {
-      case ZTR_SYMBOL_SER & 0xFFFFFFFF:
+      case LIQUID_SYMBOL_SER & 0xFFFFFFFF:
          s.read( ((char*) &ser)+4, 4 );
-         FC_ASSERT( ser == ZTR_SYMBOL_SER, "invalid asset bits" );
-         sym.asset_num = ZATTERA_ASSET_NUM_ZTR;
+         FC_ASSERT( ser == LIQUID_SYMBOL_SER, "invalid asset bits" );
+         sym.asset_num = ZATTERA_ASSET_NUM_LIQUID;
          break;
-      case ZBD_SYMBOL_SER & 0xFFFFFFFF:
+      case DOLLAR_SYMBOL_SER & 0xFFFFFFFF:
          s.read( ((char*) &ser)+4, 4 );
-         FC_ASSERT( ser == ZBD_SYMBOL_SER, "invalid asset bits" );
-         sym.asset_num = ZATTERA_ASSET_NUM_ZBD;
+         FC_ASSERT( ser == DOLLAR_SYMBOL_SER, "invalid asset bits" );
+         sym.asset_num = ZATTERA_ASSET_NUM_DOLLAR;
          break;
       case VESTS_SYMBOL_SER & 0xFFFFFFFF:
          s.read( ((char*) &ser)+4, 4 );

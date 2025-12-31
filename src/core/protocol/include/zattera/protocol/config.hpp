@@ -27,8 +27,8 @@
 #define ZATTERA_OWNER_UPDATE_LIMIT                          fc::seconds(0)
 #define ZATTERA_OWNER_AUTH_HISTORY_TRACKING_START_BLOCK_NUM 1
 
-#define ZATTERA_INITIAL_SUPPLY                  (int64_t( 250 ) * int64_t( 1000000 ) * int64_t( 1000 ))
-#define ZATTERA_ZBD_INITIAL_SUPPLY              (int64_t( 2 ) * int64_t( 1000000 ) * int64_t( 1000 ))
+#define ZATTERA_LIQUID_INITIAL_SUPPLY           (int64_t( 250 ) * int64_t( 1000000 ) * int64_t( 1000 ))
+#define ZATTERA_DOLLAR_INITIAL_SUPPLY           (int64_t( 2 ) * int64_t( 1000000 ) * int64_t( 1000 ))
 
 /// Allows to limit number of total produced blocks.
 #define TEST_MODE_BLOCK_LIMIT                   (3000000)
@@ -52,14 +52,14 @@
 #define ZATTERA_OWNER_UPDATE_LIMIT                          fc::minutes(60)
 #define ZATTERA_OWNER_AUTH_HISTORY_TRACKING_START_BLOCK_NUM 3186477
 
-#define ZATTERA_INITIAL_SUPPLY                  int64_t(0)
-#define ZATTERA_ZBD_INITIAL_SUPPLY              int64_t(0)
+#define ZATTERA_LIQUID_INITIAL_SUPPLY           int64_t(0)
+#define ZATTERA_DOLLAR_INITIAL_SUPPLY           int64_t(0)
 
 #endif
 
-#define VESTS_SYMBOL  (zattera::protocol::asset_symbol_type::from_asset_num( ZATTERA_ASSET_NUM_VESTS ) )
-#define ZTR_SYMBOL    (zattera::protocol::asset_symbol_type::from_asset_num( ZATTERA_ASSET_NUM_ZTR ) )
-#define ZBD_SYMBOL    (zattera::protocol::asset_symbol_type::from_asset_num( ZATTERA_ASSET_NUM_ZBD ) )
+#define VESTS_SYMBOL   (zattera::protocol::asset_symbol_type::from_asset_num( ZATTERA_ASSET_NUM_VESTS ) )
+#define LIQUID_SYMBOL  (zattera::protocol::asset_symbol_type::from_asset_num( ZATTERA_ASSET_NUM_LIQUID ) )
+#define DOLLAR_SYMBOL  (zattera::protocol::asset_symbol_type::from_asset_num( ZATTERA_ASSET_NUM_DOLLAR ) )
 
 #define ZATTERA_BLOCKCHAIN_HARDFORK_VERSION     ( hardfork_version( ZATTERA_BLOCKCHAIN_VERSION ) )
 
@@ -85,6 +85,7 @@
 #define ZATTERA_SAVINGS_WITHDRAW_TIME           (fc::days(3))
 #define ZATTERA_SAVINGS_WITHDRAW_REQUEST_LIMIT  100
 #define ZATTERA_VOTE_REGENERATION_SECONDS       (5*60*60*24) // 5 day
+#define ZATTERA_VOTE_POWER_RESERVE_RATE         (10)
 #define ZATTERA_MAX_VOTE_CHANGES                5
 #define ZATTERA_REVERSE_AUCTION_WINDOW_SECONDS  (60*30) // 30 minutes
 #define ZATTERA_MIN_VOTE_INTERVAL_SEC           3
@@ -93,14 +94,12 @@
 
 #define ZATTERA_MIN_ROOT_COMMENT_INTERVAL       (fc::seconds(60*5)) // 5 minutes
 #define ZATTERA_MIN_REPLY_INTERVAL              (fc::seconds(3)) // 3 seconds
-#define ZATTERA_POST_AVERAGE_WINDOW             (60*60*24u) // 1 day
-#define ZATTERA_POST_WEIGHT_CONSTANT            (uint64_t(4*ZATTERA_100_PERCENT) * (4*ZATTERA_100_PERCENT)) // (4*ZATTERA_100_PERCENT) -> 2 posts per 1 days, average 1 every 12 hours
 
 #define ZATTERA_MAX_ACCOUNT_WITNESS_VOTES       30
 
 #define ZATTERA_100_PERCENT                     10000
 #define ZATTERA_1_PERCENT                       (ZATTERA_100_PERCENT/100)
-#define ZATTERA_DEFAULT_ZBD_INTEREST_RATE       (10*ZATTERA_1_PERCENT) // < 10% APR
+#define ZATTERA_DEFAULT_DOLLAR_INTEREST_RATE    (10*ZATTERA_1_PERCENT) // < 10% APR
 
 #define ZATTERA_INFLATION_RATE_START_PERCENT    (978) // Fixes block 7,000,000 to 9.5%
 #define ZATTERA_INFLATION_RATE_STOP_PERCENT     (95) // 0.95%
@@ -125,8 +124,8 @@
 #define ZATTERA_CREATE_ACCOUNT_DELEGATION_RATIO    5
 #define ZATTERA_CREATE_ACCOUNT_DELEGATION_TIME     fc::days(30)
 
-#define ZATTERA_ACTIVE_CHALLENGE_FEE            asset( 2000, ZTR_SYMBOL )
-#define ZATTERA_OWNER_CHALLENGE_FEE             asset( 30000, ZTR_SYMBOL )
+#define ZATTERA_ACTIVE_CHALLENGE_FEE            asset( 2000, LIQUID_SYMBOL )
+#define ZATTERA_OWNER_CHALLENGE_FEE             asset( 30000, LIQUID_SYMBOL )
 #define ZATTERA_ACTIVE_CHALLENGE_COOLDOWN       fc::days(1)
 #define ZATTERA_OWNER_CHALLENGE_COOLDOWN        fc::days(1)
 
@@ -135,10 +134,10 @@
 #define ZATTERA_RECENT_RSHARES_DECAY_TIME       (fc::days(15))
 #define ZATTERA_CONTENT_CONSTANT                (uint128_t(uint64_t(2000000000000ll)))
 
-#define ZATTERA_MIN_PAYOUT_ZBD                  (asset(20,ZBD_SYMBOL))
+#define ZATTERA_MIN_PAYOUT_DOLLAR               (asset(20,DOLLAR_SYMBOL))
 
-#define ZATTERA_ZBD_STOP_PERCENT                (5*ZATTERA_1_PERCENT ) // Stop printing ZBD at 5% Market Cap
-#define ZATTERA_ZBD_START_PERCENT               (2*ZATTERA_1_PERCENT) // Start reducing printing of ZBD at 2% Market Cap
+#define ZATTERA_DOLLAR_START_PERCENT            (2*ZATTERA_1_PERCENT) // Start reducing printing of dollar at 2% Market Cap
+#define ZATTERA_DOLLAR_STOP_PERCENT             (5*ZATTERA_1_PERCENT) // Stop printing dollar at 5% Market Cap
 
 #define ZATTERA_MIN_ACCOUNT_NAME_LENGTH          3
 #define ZATTERA_MAX_ACCOUNT_NAME_LENGTH         16
@@ -155,7 +154,7 @@
 #define ZATTERA_MIN_TRANSACTION_SIZE_LIMIT      1024
 #define ZATTERA_SECONDS_PER_YEAR                (uint64_t(60*60*24*365ll))
 
-#define ZATTERA_ZBD_INTEREST_COMPOUND_INTERVAL_SEC  (60*60*24*30)
+#define ZATTERA_DOLLAR_INTEREST_COMPOUND_INTERVAL_SEC  (60*60*24*30)
 #define ZATTERA_MAX_TRANSACTION_SIZE            (1024*64)
 #define ZATTERA_MIN_BLOCK_SIZE_LIMIT            (ZATTERA_MAX_TRANSACTION_SIZE)
 #define ZATTERA_MAX_BLOCK_SIZE                  (ZATTERA_MAX_TRANSACTION_SIZE*ZATTERA_BLOCK_INTERVAL*2000)
@@ -185,9 +184,6 @@
 
 #define ZATTERA_VIRTUAL_SCHEDULE_LAP_LENGTH  ( fc::uint128(uint64_t(-1)) )
 #define ZATTERA_VIRTUAL_SCHEDULE_LAP_LENGTH2 ( fc::uint128::max_value() )
-
-#define ZATTERA_INITIAL_VOTE_POWER_RATE (40)
-#define ZATTERA_REDUCED_VOTE_POWER_RATE (10)
 
 #define ZATTERA_MAX_LIMIT_ORDER_EXPIRATION     (60*60*24*28) // 28 days
 #define ZATTERA_DELEGATION_RETURN_PERIOD       (ZATTERA_VOTE_REGENERATION_SECONDS * 2)

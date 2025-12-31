@@ -89,7 +89,7 @@ BOOST_AUTO_TEST_CASE( apply_account_creation )
 
       account_create_operation op;
 
-      op.fee = asset( 100, ZTR_SYMBOL );
+      op.fee = asset( 100, LIQUID_SYMBOL );
       op.new_account_name = "alice";
       op.creator = ZATTERA_GENESIS_WITNESS_NAME;
       op.owner = authority( 1, priv_key.get_public_key(), 1 );
@@ -147,7 +147,7 @@ BOOST_AUTO_TEST_CASE( apply_account_creation )
       BOOST_TEST_MESSAGE( "--- Test failure when creator cannot cover fee" );
       tx.signatures.clear();
       tx.operations.clear();
-      op.fee = asset( db->get_account( ZATTERA_GENESIS_WITNESS_NAME ).liquid_balance.amount + 1, ZTR_SYMBOL );
+      op.fee = asset( db->get_account( ZATTERA_GENESIS_WITNESS_NAME ).liquid_balance.amount + 1, LIQUID_SYMBOL );
       op.new_account_name = "bob";
       tx.operations.push_back( op );
       tx.sign( init_account_priv_key, db->get_chain_id() );

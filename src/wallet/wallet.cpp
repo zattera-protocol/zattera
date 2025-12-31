@@ -716,7 +716,7 @@ public:
          auto accounts = result.as<vector<database_api::api_account_object>>();
          asset total_liquid;
          asset total_vest(0, VESTS_SYMBOL );
-         asset total_dollar(0, ZBD_SYMBOL );
+         asset total_dollar(0, DOLLAR_SYMBOL );
          for( const auto& a : accounts ) {
             total_liquid += a.liquid_balance;
             total_vest  += a.vesting_share_balance;
@@ -768,7 +768,7 @@ public:
              ss << ' ' << setw( 10 ) << o.orderid;
              ss << ' ' << setw( 10 ) << (o.sell_price.base.amount.value / (double)o.sell_price.quote.amount.value);
              ss << ' ' << setw( 10 ) << fc::variant( asset( o.for_sale, o.sell_price.base.symbol ) ).as_string();
-             ss << ' ' << setw( 10 ) << (o.sell_price.base.symbol == ZTR_SYMBOL ? "SELL" : "BUY");
+             ss << ' ' << setw( 10 ) << (o.sell_price.base.symbol == LIQUID_SYMBOL ? "SELL" : "BUY");
              ss << "\n";
           }
           return ss.str();
@@ -776,8 +776,8 @@ public:
       m["get_order_book"] = []( fc::variant result, const fc::variants& a ) {
          auto orders = result.as< market_history::get_order_book_return >();
          std::stringstream ss;
-         asset bid_sum = asset( 0, ZBD_SYMBOL );
-         asset ask_sum = asset( 0, ZBD_SYMBOL );
+         asset bid_sum = asset( 0, DOLLAR_SYMBOL );
+         asset ask_sum = asset( 0, DOLLAR_SYMBOL );
          int spacing = 24;
 
          ss << setiosflags( ios::fixed ) << setiosflags( ios::left ) ;
@@ -798,11 +798,11 @@ public:
          {
             if ( i < orders.bids.size() )
             {
-               bid_sum += asset( orders.bids[i].dollars, ZBD_SYMBOL );
+               bid_sum += asset( orders.bids[i].dollars, DOLLAR_SYMBOL );
                ss
                   << ' ' << setw( spacing ) << fc::json::to_string( bid_sum )
-                  << ' ' << setw( spacing ) << fc::json::to_string( asset( orders.bids[i].dollars, ZBD_SYMBOL ) )
-                  << ' ' << setw( spacing ) << fc::json::to_string( asset( orders.bids[i].liquid, ZTR_SYMBOL ) )
+                  << ' ' << setw( spacing ) << fc::json::to_string( asset( orders.bids[i].dollars, DOLLAR_SYMBOL ) )
+                  << ' ' << setw( spacing ) << fc::json::to_string( asset( orders.bids[i].liquid, LIQUID_SYMBOL ) )
                   << ' ' << setw( spacing ) << orders.bids[i].real_price;
             }
             else
@@ -814,10 +814,10 @@ public:
 
             if ( i < orders.asks.size() )
             {
-               ask_sum += asset( orders.asks[i].dollars, ZBD_SYMBOL );
+               ask_sum += asset( orders.asks[i].dollars, DOLLAR_SYMBOL );
                ss << ' ' << setw( spacing ) << orders.asks[i].real_price
-                  << ' ' << setw( spacing ) << fc::json::to_string( asset( orders.asks[i].liquid, ZTR_SYMBOL ) )
-                  << ' ' << setw( spacing ) << fc::json::to_string( asset( orders.asks[i].dollars, ZBD_SYMBOL ) )
+                  << ' ' << setw( spacing ) << fc::json::to_string( asset( orders.asks[i].liquid, LIQUID_SYMBOL ) )
+                  << ' ' << setw( spacing ) << fc::json::to_string( asset( orders.asks[i].dollars, DOLLAR_SYMBOL ) )
                   << ' ' << setw( spacing ) << fc::json::to_string( ask_sum );
             }
 
@@ -1193,7 +1193,7 @@ signed_transaction wallet_api::create_account_with_keys(
    op.posting = authority( 1, posting, 1 );
    op.memo_key = memo;
    op.json_metadata = json_meta;
-   op.fee = my->_remote_api.get_chain_properties().account_creation_fee * asset( ZATTERA_CREATE_ACCOUNT_WITH_ZATTERA_MODIFIER, ZTR_SYMBOL );
+   op.fee = my->_remote_api.get_chain_properties().account_creation_fee * asset( ZATTERA_CREATE_ACCOUNT_WITH_ZATTERA_MODIFIER, LIQUID_SYMBOL );
 
    signed_transaction tx;
    tx.operations.push_back(op);

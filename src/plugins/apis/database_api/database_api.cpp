@@ -1263,15 +1263,15 @@ DEFINE_API_IMPL( database_api_impl, get_order_book )
    FC_ASSERT( args.limit <= DATABASE_API_SINGLE_QUERY_LIMIT );
    get_order_book_return result;
 
-   auto max_sell = price::max( ZBD_SYMBOL, ZTR_SYMBOL );
-   auto max_buy = price::max( ZTR_SYMBOL, ZBD_SYMBOL );
+   auto max_sell = price::max( DOLLAR_SYMBOL, LIQUID_SYMBOL );
+   auto max_buy = price::max( LIQUID_SYMBOL, DOLLAR_SYMBOL );
 
    const auto& limit_price_idx = _db.get_index< chain::limit_order_index >().indices().get< chain::by_price >();
    auto sell_itr = limit_price_idx.lower_bound( max_sell );
    auto buy_itr  = limit_price_idx.lower_bound( max_buy );
    auto end = limit_price_idx.end();
 
-   while( sell_itr != end && sell_itr->sell_price.base.symbol == ZBD_SYMBOL && result.bids.size() < args.limit )
+   while( sell_itr != end && sell_itr->sell_price.base.symbol == DOLLAR_SYMBOL && result.bids.size() < args.limit )
    {
       auto itr = sell_itr;
       order cur;
@@ -1279,12 +1279,12 @@ DEFINE_API_IMPL( database_api_impl, get_order_book )
       cur.real_price  = 0.0;
       // cur.real_price  = (cur.order_price).to_real();
       cur.dollars = itr->for_sale;
-      cur.liquid = ( asset( itr->for_sale, ZBD_SYMBOL ) * cur.order_price ).amount;
+      cur.liquid = ( asset( itr->for_sale, DOLLAR_SYMBOL ) * cur.order_price ).amount;
       cur.created = itr->created;
       result.bids.push_back( cur );
       ++sell_itr;
    }
-   while( buy_itr != end && buy_itr->sell_price.base.symbol == ZTR_SYMBOL && result.asks.size() < args.limit )
+   while( buy_itr != end && buy_itr->sell_price.base.symbol == LIQUID_SYMBOL && result.asks.size() < args.limit )
    {
       auto itr = buy_itr;
       order cur;
@@ -1292,7 +1292,7 @@ DEFINE_API_IMPL( database_api_impl, get_order_book )
       cur.real_price = 0.0;
       // cur.real_price  = (~cur.order_price).to_real();
       cur.liquid  = itr->for_sale;
-      cur.dollars = ( asset( itr->for_sale, ZTR_SYMBOL ) * cur.order_price ).amount;
+      cur.dollars = ( asset( itr->for_sale, LIQUID_SYMBOL ) * cur.order_price ).amount;
       cur.created = itr->created;
       result.asks.push_back( cur );
       ++buy_itr;

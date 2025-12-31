@@ -317,9 +317,9 @@ void account_create_with_delegation_evaluator::do_apply( const account_create_wi
                ( "creator.vesting_share_balance", creator.vesting_share_balance )
                ( "creator.delegated_vesting_share_balance", creator.delegated_vesting_share_balance )( "required", o.delegation ) );
 
-   auto target_delegation = asset( wso.median_props.account_creation_fee.amount * ZATTERA_CREATE_ACCOUNT_WITH_ZATTERA_MODIFIER * ZATTERA_CREATE_ACCOUNT_DELEGATION_RATIO, ZTR_SYMBOL ) * props.get_vesting_share_price();
+   auto target_delegation = asset( wso.median_props.account_creation_fee.amount * ZATTERA_CREATE_ACCOUNT_WITH_ZATTERA_MODIFIER * ZATTERA_CREATE_ACCOUNT_DELEGATION_RATIO, LIQUID_SYMBOL ) * props.get_vesting_share_price();
 
-   auto current_delegation = asset( o.fee.amount * ZATTERA_CREATE_ACCOUNT_DELEGATION_RATIO, ZTR_SYMBOL ) * props.get_vesting_share_price() + o.delegation;
+   auto current_delegation = asset( o.fee.amount * ZATTERA_CREATE_ACCOUNT_DELEGATION_RATIO, LIQUID_SYMBOL ) * props.get_vesting_share_price() + o.delegation;
 
    FC_ASSERT( current_delegation >= target_delegation, "Inssufficient Delegation ${f} required, ${p} provided.",
                ("f", target_delegation )
@@ -738,7 +738,7 @@ void escrow_transfer_evaluator::do_apply( const escrow_transfer_operation& o )
 
       asset liquid_spent = o.liquid_amount;
       asset dollars_spent = o.dollar_amount;
-      if( o.fee.symbol == ZTR_SYMBOL )
+      if( o.fee.symbol == LIQUID_SYMBOL )
          liquid_spent += o.fee;
       else
          dollars_spent += o.fee;
@@ -1450,7 +1450,7 @@ void custom_binary_evaluator::do_apply( const custom_binary_operation& o )
 
 void feed_publish_evaluator::do_apply( const feed_publish_operation& o )
 {
-   FC_ASSERT( is_asset_type( o.exchange_rate.base, ZBD_SYMBOL ) && is_asset_type( o.exchange_rate.quote, ZTR_SYMBOL ),
+   FC_ASSERT( is_asset_type( o.exchange_rate.base, DOLLAR_SYMBOL ) && is_asset_type( o.exchange_rate.quote, LIQUID_SYMBOL ),
          "Price feed must be a ZBD/ZTR price" );
 
    const auto& witness = _db.get_witness( o.publisher );
@@ -1837,12 +1837,12 @@ void claim_reward_balance_evaluator::do_apply( const claim_reward_balance_operat
    FC_ASSERT( op.reward_vests <= acnt.reward_vesting_share_balance, "Cannot claim that much VESTS. Claim: ${c} Actual: ${a}",
       ("c", op.reward_vests)("a", acnt.reward_vesting_share_balance) );
 
-   asset reward_vesting_liquid_to_move = asset( 0, ZTR_SYMBOL );
+   asset reward_vesting_liquid_to_move = asset( 0, LIQUID_SYMBOL );
    if( op.reward_vests == acnt.reward_vesting_share_balance )
       reward_vesting_liquid_to_move = acnt.reward_vesting_liquid_balance;
    else
       reward_vesting_liquid_to_move = asset( ( ( uint128_t( op.reward_vests.amount.value ) * uint128_t( acnt.reward_vesting_liquid_balance.amount.value ) )
-         / uint128_t( acnt.reward_vesting_share_balance.amount.value ) ).to_uint64(), ZTR_SYMBOL );
+         / uint128_t( acnt.reward_vesting_share_balance.amount.value ) ).to_uint64(), LIQUID_SYMBOL );
 
    _db.adjust_reward_balance( acnt, -op.reward_liquids );
    _db.adjust_reward_balance( acnt, -op.reward_dollars );
@@ -1879,8 +1879,8 @@ void delegate_vesting_shares_evaluator::do_apply( const delegate_vesting_shares_
    const auto& wso = _db.get_witness_schedule_object();
    const auto& gpo = _db.get_dynamic_global_properties();
 
-   auto min_delegation = asset( wso.median_props.account_creation_fee.amount / 3, ZTR_SYMBOL ) * gpo.get_vesting_share_price();
-   auto min_update = asset( wso.median_props.account_creation_fee.amount / 30, ZTR_SYMBOL ) * gpo.get_vesting_share_price();
+   auto min_delegation = asset( wso.median_props.account_creation_fee.amount / 3, LIQUID_SYMBOL ) * gpo.get_vesting_share_price();
+   auto min_update = asset( wso.median_props.account_creation_fee.amount / 30, LIQUID_SYMBOL ) * gpo.get_vesting_share_price();
 
    // If delegation doesn't exist, create it
    if( delegation == nullptr )

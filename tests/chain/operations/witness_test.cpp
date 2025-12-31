@@ -113,7 +113,7 @@ BOOST_AUTO_TEST_CASE( apply_witness_update )
       op.url = "foo.bar";
       op.fee = ASSET( "1.000 TTR" );
       op.block_signing_key = signing_key.get_public_key();
-      op.props.account_creation_fee = legacy_zattera_asset::from_asset( asset(ZATTERA_MIN_ACCOUNT_CREATION_FEE + 10, ZTR_SYMBOL) );
+      op.props.account_creation_fee = legacy_zattera_asset::from_asset( asset(ZATTERA_MIN_ACCOUNT_CREATION_FEE + 10, LIQUID_SYMBOL) );
       op.props.maximum_block_size = ZATTERA_MIN_BLOCK_SIZE_LIMIT + 100;
 
       signed_transaction tx;
@@ -318,7 +318,7 @@ BOOST_AUTO_TEST_CASE( validate_witness_set_properties )
       op.url = "foo.bar";
       op.fee = ASSET( "1.000 TTR" );
       op.block_signing_key = signing_key.get_public_key();
-      op.props.account_creation_fee = legacy_zattera_asset::from_asset( asset(ZATTERA_MIN_ACCOUNT_CREATION_FEE + 10, ZTR_SYMBOL) );
+      op.props.account_creation_fee = legacy_zattera_asset::from_asset( asset(ZATTERA_MIN_ACCOUNT_CREATION_FEE + 10, LIQUID_SYMBOL) );
       op.props.maximum_block_size = ZATTERA_MIN_BLOCK_SIZE_LIMIT + 100;
 
       signed_transaction tx;
@@ -436,7 +436,7 @@ BOOST_AUTO_TEST_CASE( apply_witness_set_properties )
       op.url = "foo.bar";
       op.fee = ASSET( "1.000 TTR" );
       op.block_signing_key = signing_key.get_public_key();
-      op.props.account_creation_fee = legacy_zattera_asset::from_asset( asset(ZATTERA_MIN_ACCOUNT_CREATION_FEE + 10, ZTR_SYMBOL) );
+      op.props.account_creation_fee = legacy_zattera_asset::from_asset( asset(ZATTERA_MIN_ACCOUNT_CREATION_FEE + 10, LIQUID_SYMBOL) );
       op.props.maximum_block_size = ZATTERA_MIN_BLOCK_SIZE_LIMIT + 100;
 
       signed_transaction tx;
@@ -578,7 +578,7 @@ BOOST_AUTO_TEST_CASE( calculate_feed_publish_mean )
       // Upgrade accounts to witnesses
       for( int i = 0; i < 7; i++ )
       {
-         transfer( ZATTERA_GENESIS_WITNESS_NAME, accounts[i], asset( 10000, ZTR_SYMBOL ) );
+         transfer( ZATTERA_GENESIS_WITNESS_NAME, accounts[i], asset( 10000, LIQUID_SYMBOL ) );
          witness_create( accounts[i], keys[i], "foo.bar", keys[i].get_public_key(), 1000 );
 
          ops.push_back( feed_publish_operation() );
@@ -587,13 +587,13 @@ BOOST_AUTO_TEST_CASE( calculate_feed_publish_mean )
          txs.push_back( signed_transaction() );
       }
 
-      ops[0].exchange_rate = price( asset( 1000, ZBD_SYMBOL ), asset( 100000, ZTR_SYMBOL ) );
-      ops[1].exchange_rate = price( asset( 1000, ZBD_SYMBOL ), asset( 105000, ZTR_SYMBOL ) );
-      ops[2].exchange_rate = price( asset( 1000, ZBD_SYMBOL ), asset(  98000, ZTR_SYMBOL ) );
-      ops[3].exchange_rate = price( asset( 1000, ZBD_SYMBOL ), asset(  97000, ZTR_SYMBOL ) );
-      ops[4].exchange_rate = price( asset( 1000, ZBD_SYMBOL ), asset(  99000, ZTR_SYMBOL ) );
-      ops[5].exchange_rate = price( asset( 1000, ZBD_SYMBOL ), asset(  97500, ZTR_SYMBOL ) );
-      ops[6].exchange_rate = price( asset( 1000, ZBD_SYMBOL ), asset( 102000, ZTR_SYMBOL ) );
+      ops[0].exchange_rate = price( asset( 1000, DOLLAR_SYMBOL ), asset( 100000, LIQUID_SYMBOL ) );
+      ops[1].exchange_rate = price( asset( 1000, DOLLAR_SYMBOL ), asset( 105000, LIQUID_SYMBOL ) );
+      ops[2].exchange_rate = price( asset( 1000, DOLLAR_SYMBOL ), asset(  98000, LIQUID_SYMBOL ) );
+      ops[3].exchange_rate = price( asset( 1000, DOLLAR_SYMBOL ), asset(  97000, LIQUID_SYMBOL ) );
+      ops[4].exchange_rate = price( asset( 1000, DOLLAR_SYMBOL ), asset(  99000, LIQUID_SYMBOL ) );
+      ops[5].exchange_rate = price( asset( 1000, DOLLAR_SYMBOL ), asset(  97500, LIQUID_SYMBOL ) );
+      ops[6].exchange_rate = price( asset( 1000, DOLLAR_SYMBOL ), asset( 102000, LIQUID_SYMBOL ) );
 
       for( int i = 0; i < 7; i++ )
       {
@@ -609,8 +609,8 @@ BOOST_AUTO_TEST_CASE( calculate_feed_publish_mean )
       BOOST_TEST_MESSAGE( "Get feed history object" );
       feed_history_object feed_history = db->get_feed_history();
       BOOST_TEST_MESSAGE( "Check state" );
-      BOOST_REQUIRE( feed_history.current_median_history == price( asset( 1000, ZBD_SYMBOL ), asset( 99000, ZTR_SYMBOL) ) );
-      BOOST_REQUIRE( feed_history.price_history[ 0 ] == price( asset( 1000, ZBD_SYMBOL ), asset( 99000, ZTR_SYMBOL) ) );
+      BOOST_REQUIRE( feed_history.current_median_history == price( asset( 1000, DOLLAR_SYMBOL ), asset( 99000, LIQUID_SYMBOL) ) );
+      BOOST_REQUIRE( feed_history.price_history[ 0 ] == price( asset( 1000, DOLLAR_SYMBOL ), asset( 99000, LIQUID_SYMBOL) ) );
       validate_database();
 
       for ( int i = 0; i < 23; i++ )
@@ -621,7 +621,7 @@ BOOST_AUTO_TEST_CASE( calculate_feed_publish_mean )
          {
             txs[j].operations.clear();
             txs[j].signatures.clear();
-            ops[j].exchange_rate = price( ops[j].exchange_rate.base, asset( ops[j].exchange_rate.quote.amount + 10, ZTR_SYMBOL ) );
+            ops[j].exchange_rate = price( ops[j].exchange_rate.base, asset( ops[j].exchange_rate.quote.amount + 10, LIQUID_SYMBOL ) );
             txs[j].set_expiration( db->head_block_time() + ZATTERA_MAX_TIME_UNTIL_EXPIRATION );
             txs[j].operations.push_back( ops[j] );
             txs[j].sign( keys[j], db->get_chain_id() );

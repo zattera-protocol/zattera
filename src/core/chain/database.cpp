@@ -71,7 +71,7 @@ using boost::container::flat_set;
 struct reward_fund_context
 {
    uint128_t   recent_claims = 0;
-   asset       reward_balance = asset( 0, ZTR_SYMBOL );
+   asset       reward_balance = asset( 0, LIQUID_SYMBOL );
    share_type  liquid_awarded = 0;
 };
 
@@ -110,7 +110,7 @@ void database::open( const open_args& args )
       if( !find< dynamic_global_property_object >() )
          with_write_lock( [&]()
          {
-            init_genesis( args.initial_supply, args.dollar_initial_supply );
+            init_genesis( args.liquid_initial_supply, args.dollar_initial_supply );
          });
 
       _benchmark_dumper.set_enabled( args.benchmark_is_enabled );
@@ -1110,7 +1110,7 @@ uint32_t database::get_slot_at_time(fc::time_point_sec when)const
  */
 std::pair< asset, asset > database::create_dollar( const account_object& to_account, asset liquid, bool to_reward_balance )
 {
-   std::pair< asset, asset > assets( asset( 0, ZBD_SYMBOL ), asset( 0, ZTR_SYMBOL ) );
+   std::pair< asset, asset > assets( asset( 0, DOLLAR_SYMBOL ), asset( 0, LIQUID_SYMBOL ) );
 
    try
    {
@@ -1125,23 +1125,23 @@ std::pair< asset, asset > database::create_dollar( const account_object& to_acco
          auto to_dollar = ( gpo.dollar_print_rate * liquid.amount ) / ZATTERA_100_PERCENT;
          auto to_liquid = liquid.amount - to_dollar;
 
-         auto dollars = asset( to_dollar, ZTR_SYMBOL ) * median_price;
+         auto dollars = asset( to_dollar, LIQUID_SYMBOL ) * median_price;
 
          if( to_reward_balance )
          {
             adjust_reward_balance( to_account, dollars );
-            adjust_reward_balance( to_account, asset( to_liquid, ZTR_SYMBOL ) );
+            adjust_reward_balance( to_account, asset( to_liquid, LIQUID_SYMBOL ) );
          }
          else
          {
             adjust_balance( to_account, dollars );
-            adjust_balance( to_account, asset( to_liquid, ZTR_SYMBOL ) );
+            adjust_balance( to_account, asset( to_liquid, LIQUID_SYMBOL ) );
          }
 
-         adjust_supply( asset( -to_dollar, ZTR_SYMBOL ) );
+         adjust_supply( asset( -to_dollar, LIQUID_SYMBOL ) );
          adjust_supply( dollars );
          assets.first = dollars;
-         assets.second = asset( to_liquid, ZTR_SYMBOL );
+         assets.second = asset( to_liquid, LIQUID_SYMBOL );
       }
       else
       {
@@ -1181,7 +1181,7 @@ asset database::create_vesting( const account_object& to_account, asset liquid, 
          return new_vesting;
          };
 
-      FC_ASSERT( liquid.symbol == ZTR_SYMBOL );
+      FC_ASSERT( liquid.symbol == LIQUID_SYMBOL );
       // ^ A novelty, needed but risky in case someone managed to slip ZBD/TESTS here in blockchain history.
       // Get share price.
       const auto& cprops = get_dynamic_global_properties();
@@ -1321,8 +1321,8 @@ void database::clear_witness_votes( const account_object& a )
 void database::clear_null_account_balance()
 {
    const auto& null_account = get_account( ZATTERA_NULL_ACCOUNT );
-   asset total_liquid( 0, ZTR_SYMBOL );
-   asset total_dollars( 0, ZBD_SYMBOL );
+   asset total_liquid( 0, LIQUID_SYMBOL );
+   asset total_dollars( 0, DOLLAR_SYMBOL );
 
    if( null_account.liquid_balance.amount > 0 )
    {
@@ -1467,7 +1467,7 @@ void database::process_vesting_withdrawals()
 
       share_type vests_deposited_as_liquid = 0;
       share_type vests_deposited_as_vests = 0;
-      asset total_liquid_converted = asset( 0, ZTR_SYMBOL );
+      asset total_liquid_converted = asset( 0, LIQUID_SYMBOL );
 
       // Do two passes, the first for vests, the second for liquid. Try to maintain as much accuracy for vests as possible.
       for( auto itr = didx.upper_bound( boost::make_tuple( from_account.name, account_name_type() ) );
@@ -1623,7 +1623,7 @@ share_type database::pay_curators( const comment_object& c, share_type& max_rewa
             {
                unclaimed_rewards -= claim;
                const auto& voter = get( item->voter );
-               auto reward = create_vesting( voter, asset( claim, ZTR_SYMBOL ), true );
+               auto reward = create_vesting( voter, asset( claim, LIQUID_SYMBOL ), true );
 
                push_virtual_operation( curation_reward_operation( voter.name, reward, c.author, to_string( c.permlink ) ) );
 
@@ -1682,7 +1682,7 @@ share_type database::cashout_comment_helper( util::comment_reward_context& ctx, 
             for( auto& b : comment.beneficiaries )
             {
                auto benefactor_tokens = ( author_tokens * b.weight ) / ZATTERA_100_PERCENT;
-               auto vest_created = create_vesting( get_account( b.account ), asset( benefactor_tokens, ZTR_SYMBOL ), true );
+               auto vest_created = create_vesting( get_account( b.account ), asset( benefactor_tokens, LIQUID_SYMBOL ), true );
                push_virtual_operation( comment_benefactor_reward_operation( b.account, comment.author, to_string( comment.permlink ), vest_created ) );
                total_beneficiary += benefactor_tokens;
             }
@@ -1693,13 +1693,13 @@ share_type database::cashout_comment_helper( util::comment_reward_context& ctx, 
             auto vesting_liquid = author_tokens - dollar_amount;
 
             const auto& author = get_account( comment.author );
-            auto vest_created = create_vesting( author, asset( vesting_liquid, ZTR_SYMBOL ), true );
-            auto dollar_payout = create_dollar( author, asset( dollar_amount, ZTR_SYMBOL ), true );
+            auto vest_created = create_vesting( author, asset( vesting_liquid, LIQUID_SYMBOL ), true );
+            auto dollar_payout = create_dollar( author, asset( dollar_amount, LIQUID_SYMBOL ), true );
 
-            adjust_total_payout( comment, dollar_payout.first + to_dollar( dollar_payout.second + asset( vesting_liquid, ZTR_SYMBOL ) ), to_dollar( asset( curation_tokens, ZTR_SYMBOL ) ), to_dollar( asset( total_beneficiary, ZTR_SYMBOL ) ) );
+            adjust_total_payout( comment, dollar_payout.first + to_dollar( dollar_payout.second + asset( vesting_liquid, LIQUID_SYMBOL ) ), to_dollar( asset( curation_tokens, LIQUID_SYMBOL ) ), to_dollar( asset( total_beneficiary, LIQUID_SYMBOL ) ) );
 
             push_virtual_operation( author_reward_operation( comment.author, to_string( comment.permlink ), dollar_payout.first, dollar_payout.second, vest_created ) );
-            push_virtual_operation( comment_reward_operation( comment.author, to_string( comment.permlink ), to_dollar( asset( claimed_reward, ZTR_SYMBOL ) ) ) );
+            push_virtual_operation( comment_reward_operation( comment.author, to_string( comment.permlink ), to_dollar( asset( claimed_reward, LIQUID_SYMBOL ) ) ) );
 
             #ifndef IS_LOW_MEM
                modify( comment, [&]( comment_object& c )
@@ -1844,7 +1844,7 @@ void database::process_comment_cashout()
          modify( get< reward_fund_object, by_id >( reward_fund_id_type( i ) ), [&]( reward_fund_object& rfo )
          {
             rfo.recent_claims = funds[ i ].recent_claims;
-            rfo.reward_balance -= asset( funds[ i ].liquid_awarded, ZTR_SYMBOL );
+            rfo.reward_balance -= asset( funds[ i ].liquid_awarded, LIQUID_SYMBOL );
          });
       }
    }
@@ -1933,12 +1933,12 @@ void database::process_funds()
 
    modify( props, [&]( dynamic_global_property_object& p )
    {
-      p.total_vesting_fund_liquid += asset( vesting_reward, ZTR_SYMBOL );
-      p.current_liquid_supply           += asset( new_liquid, ZTR_SYMBOL );
-      p.virtual_liquid_supply           += asset( new_liquid, ZTR_SYMBOL );
+      p.total_vesting_fund_liquid += asset( vesting_reward, LIQUID_SYMBOL );
+      p.current_liquid_supply           += asset( new_liquid, LIQUID_SYMBOL );
+      p.virtual_liquid_supply           += asset( new_liquid, LIQUID_SYMBOL );
    });
 
-   const auto& producer_reward = create_vesting( get_account( cwit.owner ), asset( witness_reward, ZTR_SYMBOL ) );
+   const auto& producer_reward = create_vesting( get_account( cwit.owner ), asset( witness_reward, LIQUID_SYMBOL ) );
    push_virtual_operation( producer_reward_operation( cwit.owner, producer_reward ) );
 }
 
@@ -1980,7 +1980,7 @@ share_type database::pay_reward_funds( share_type reward )
 
       modify( *itr, [&]( reward_fund_object& rfo )
       {
-         rfo.reward_balance += asset( r, ZTR_SYMBOL );
+         rfo.reward_balance += asset( r, LIQUID_SYMBOL );
       });
 
       used_rewards += r;
@@ -2007,8 +2007,8 @@ void database::process_conversions()
    if( fhistory.current_median_history.is_null() )
       return;
 
-   asset net_dollars( 0, ZBD_SYMBOL );
-   asset net_liquid( 0, ZTR_SYMBOL );
+   asset net_dollars( 0, DOLLAR_SYMBOL );
+   asset net_liquid( 0, LIQUID_SYMBOL );
 
    while( itr != request_by_date.end() && itr->conversion_date <= now )
    {
@@ -2316,7 +2316,7 @@ void database::init_schema()
    return;*/
 }
 
-void database::init_genesis( uint64_t initial_supply, uint64_t dollar_initial_supply )
+void database::init_genesis( uint64_t liquid_initial_supply, uint64_t dollar_initial_supply )
 {
    try
    {
@@ -2366,8 +2366,8 @@ void database::init_genesis( uint64_t initial_supply, uint64_t dollar_initial_su
          {
             a.name = ZATTERA_GENESIS_WITNESS_NAME + ( i ? fc::to_string( i ) : std::string() );
             a.memo_key = genesis_public_key;
-            a.liquid_balance  = asset( i ? 0 : initial_supply, ZTR_SYMBOL );
-            a.dollar_balance = asset( i ? 0 : dollar_initial_supply, ZBD_SYMBOL );
+            a.liquid_balance  = asset( i ? 0 : liquid_initial_supply, LIQUID_SYMBOL );
+            a.dollar_balance = asset( i ? 0 : dollar_initial_supply, DOLLAR_SYMBOL );
          } );
 
          create< account_authority_object >( [&]( account_authority_object& auth )
@@ -2401,11 +2401,11 @@ void database::init_genesis( uint64_t initial_supply, uint64_t dollar_initial_su
          p.time = ZATTERA_GENESIS_TIME;
          p.recent_slots_filled = fc::uint128::max_value();
          p.participation_count = 128;
-         p.current_liquid_supply = asset( initial_supply, ZTR_SYMBOL );
+         p.current_liquid_supply = asset( liquid_initial_supply, LIQUID_SYMBOL );
          p.virtual_liquid_supply = p.current_liquid_supply;
-         p.current_dollar_supply = asset( dollar_initial_supply, ZBD_SYMBOL );
+         p.current_dollar_supply = asset( dollar_initial_supply, DOLLAR_SYMBOL );
          p.maximum_block_size = ZATTERA_MAX_BLOCK_SIZE;
-         p.vote_power_reserve_rate = ZATTERA_REDUCED_VOTE_POWER_RATE;
+         p.vote_power_reserve_rate = ZATTERA_VOTE_POWER_RESERVE_RATE;
          p.delegation_return_period = ZATTERA_DELEGATION_RETURN_PERIOD;
       } );
 
@@ -2434,7 +2434,7 @@ void database::init_genesis( uint64_t initial_supply, uint64_t dollar_initial_su
          rfo.content_constant = ZATTERA_CONTENT_CONSTANT;
          rfo.percent_curation_rewards = ZATTERA_1_PERCENT * 25;
          rfo.percent_content_rewards = ZATTERA_100_PERCENT;
-         rfo.reward_balance = asset( 0, ZTR_SYMBOL );
+         rfo.reward_balance = asset( 0, LIQUID_SYMBOL );
          rfo.recent_claims = 0;
          rfo.author_reward_curve = curve_id::linear;
          rfo.curation_reward_curve = curve_id::square_root;
@@ -2864,7 +2864,7 @@ try {
                return;
 #endif
             const auto& gpo = get_dynamic_global_properties();
-            price min_price( asset( 9 * gpo.current_dollar_supply.amount, ZBD_SYMBOL ), gpo.current_liquid_supply ); // This price limits ZBD to 10% market cap
+            price min_price( asset( 9 * gpo.current_dollar_supply.amount, DOLLAR_SYMBOL ), gpo.current_liquid_supply ); // This price limits ZBD to 10% market cap
 
             if( min_price > fho.current_median_history )
                fho.current_median_history = min_price;
@@ -3206,7 +3206,7 @@ void database::update_virtual_supply()
    modify( get_dynamic_global_properties(), [&]( dynamic_global_property_object& dgp )
    {
       dgp.virtual_liquid_supply = dgp.current_liquid_supply
-         + ( get_feed_history().current_median_history.is_null() ? asset( 0, ZTR_SYMBOL ) : dgp.current_dollar_supply * get_feed_history().current_median_history );
+         + ( get_feed_history().current_median_history.is_null() ? asset( 0, LIQUID_SYMBOL ) : dgp.current_dollar_supply * get_feed_history().current_median_history );
 
       auto median_price = get_feed_history().current_median_history;
 
@@ -3215,12 +3215,12 @@ void database::update_virtual_supply()
          auto percent_dollar = uint16_t( ( ( fc::uint128_t( ( dgp.current_dollar_supply * get_feed_history().current_median_history ).amount.value ) * ZATTERA_100_PERCENT )
             / dgp.virtual_liquid_supply.amount.value ).to_uint64() );
 
-         if( percent_dollar <= ZATTERA_ZBD_START_PERCENT )
+         if( percent_dollar <= ZATTERA_DOLLAR_START_PERCENT )
             dgp.dollar_print_rate = ZATTERA_100_PERCENT;
-         else if( percent_dollar >= ZATTERA_ZBD_STOP_PERCENT )
+         else if( percent_dollar >= ZATTERA_DOLLAR_STOP_PERCENT )
             dgp.dollar_print_rate = 0;
          else
-            dgp.dollar_print_rate = ( ( ZATTERA_ZBD_STOP_PERCENT - percent_dollar ) * ZATTERA_100_PERCENT ) / ( ZATTERA_ZBD_STOP_PERCENT - ZATTERA_ZBD_START_PERCENT );
+            dgp.dollar_print_rate = ( ( ZATTERA_DOLLAR_STOP_PERCENT - percent_dollar ) * ZATTERA_100_PERCENT ) / ( ZATTERA_DOLLAR_STOP_PERCENT - ZATTERA_DOLLAR_START_PERCENT );
       }
    });
 } FC_CAPTURE_AND_RETHROW() }
@@ -3503,26 +3503,26 @@ void database::modify_balance( const account_object& a, const asset& delta, bool
    {
       switch( delta.symbol.asset_num )
       {
-         case ZATTERA_ASSET_NUM_ZTR:
+         case ZATTERA_ASSET_NUM_LIQUID:
             acnt.liquid_balance += delta;
             if( check_balance )
             {
                FC_ASSERT( acnt.liquid_balance.amount.value >= 0, "Insufficient ZTR funds" );
             }
             break;
-         case ZATTERA_ASSET_NUM_ZBD:
+         case ZATTERA_ASSET_NUM_DOLLAR:
             if( a.dollar_seconds_last_update != head_block_time() )
             {
                acnt.dollar_seconds += fc::uint128_t(a.dollar_balance.amount.value) * (head_block_time() - a.dollar_seconds_last_update).to_seconds();
                acnt.dollar_seconds_last_update = head_block_time();
 
                if( acnt.dollar_seconds > 0 &&
-                   (acnt.dollar_seconds_last_update - acnt.dollar_last_interest_payment).to_seconds() > ZATTERA_ZBD_INTEREST_COMPOUND_INTERVAL_SEC )
+                   (acnt.dollar_seconds_last_update - acnt.dollar_last_interest_payment).to_seconds() > ZATTERA_DOLLAR_INTEREST_COMPOUND_INTERVAL_SEC )
                {
                   auto interest = acnt.dollar_seconds / ZATTERA_SECONDS_PER_YEAR;
                   interest *= get_dynamic_global_properties().dollar_interest_rate;
                   interest /= ZATTERA_100_PERCENT;
-                  asset interest_paid(interest.to_uint64(), ZBD_SYMBOL);
+                  asset interest_paid(interest.to_uint64(), DOLLAR_SYMBOL);
                   acnt.dollar_balance += interest_paid;
                   acnt.dollar_seconds = 0;
                   acnt.dollar_last_interest_payment = head_block_time();
@@ -3562,7 +3562,7 @@ void database::modify_reward_balance( const account_object& a, const asset& valu
    {
       switch( value_delta.symbol.asset_num )
       {
-         case ZATTERA_ASSET_NUM_ZTR:
+         case ZATTERA_ASSET_NUM_LIQUID:
             if( share_delta.amount.value == 0 )
             {
                acnt.reward_liquid_balance += value_delta;
@@ -3581,7 +3581,7 @@ void database::modify_reward_balance( const account_object& a, const asset& valu
                }
             }
             break;
-         case ZATTERA_ASSET_NUM_ZBD:
+         case ZATTERA_ASSET_NUM_DOLLAR:
             FC_ASSERT( share_delta.amount.value == 0 );
             acnt.reward_dollar_balance += value_delta;
             if( check_balance )
@@ -3612,23 +3612,23 @@ void database::adjust_savings_liquid_balance( const account_object& a, const ass
    {
       switch( delta.symbol.asset_num )
       {
-         case ZATTERA_ASSET_NUM_ZTR:
+         case ZATTERA_ASSET_NUM_LIQUID:
             acnt.savings_liquid_balance += delta;
             FC_ASSERT( acnt.savings_liquid_balance.amount.value >= 0, "Insufficient savings ZTR funds" );
             break;
-         case ZATTERA_ASSET_NUM_ZBD:
+         case ZATTERA_ASSET_NUM_DOLLAR:
             if( a.savings_dollar_seconds_last_update != head_block_time() )
             {
                acnt.savings_dollar_seconds += fc::uint128_t(a.savings_dollar_balance.amount.value) * (head_block_time() - a.savings_dollar_seconds_last_update).to_seconds();
                acnt.savings_dollar_seconds_last_update = head_block_time();
 
                if( acnt.savings_dollar_seconds > 0 &&
-                   (acnt.savings_dollar_seconds_last_update - acnt.savings_dollar_last_interest_payment).to_seconds() > ZATTERA_ZBD_INTEREST_COMPOUND_INTERVAL_SEC )
+                   (acnt.savings_dollar_seconds_last_update - acnt.savings_dollar_last_interest_payment).to_seconds() > ZATTERA_DOLLAR_INTEREST_COMPOUND_INTERVAL_SEC )
                {
                   auto interest = acnt.savings_dollar_seconds / ZATTERA_SECONDS_PER_YEAR;
                   interest *= get_dynamic_global_properties().dollar_interest_rate;
                   interest /= ZATTERA_100_PERCENT;
-                  asset interest_paid(interest.to_uint64(), ZBD_SYMBOL);
+                  asset interest_paid(interest.to_uint64(), DOLLAR_SYMBOL);
                   acnt.savings_dollar_balance += interest_paid;
                   acnt.savings_dollar_seconds = 0;
                   acnt.savings_dollar_last_interest_payment = head_block_time();
@@ -3679,16 +3679,16 @@ void database::adjust_supply( const asset& delta, bool adjust_vesting )
    {
       switch( delta.symbol.asset_num )
       {
-         case ZATTERA_ASSET_NUM_ZTR:
+         case ZATTERA_ASSET_NUM_LIQUID:
          {
-            asset new_vesting( (adjust_vesting && delta.amount > 0) ? delta.amount * 9 : 0, ZTR_SYMBOL );
+            asset new_vesting( (adjust_vesting && delta.amount > 0) ? delta.amount * 9 : 0, LIQUID_SYMBOL );
             props.current_liquid_supply += delta + new_vesting;
             props.virtual_liquid_supply += delta + new_vesting;
             props.total_vesting_fund_liquid += new_vesting;
             FC_ASSERT( props.current_liquid_supply.amount.value >= 0 );
             break;
          }
-         case ZATTERA_ASSET_NUM_ZBD:
+         case ZATTERA_ASSET_NUM_DOLLAR:
             props.current_dollar_supply += delta;
             props.virtual_liquid_supply = props.current_dollar_supply * get_feed_history().current_median_history + props.current_liquid_supply;
             FC_ASSERT( props.current_dollar_supply.amount.value >= 0 );
@@ -3704,9 +3704,9 @@ asset database::get_balance( const account_object& a, asset_symbol_type symbol )
 {
    switch( symbol.asset_num )
    {
-      case ZATTERA_ASSET_NUM_ZTR:
+      case ZATTERA_ASSET_NUM_LIQUID:
          return a.liquid_balance;
-      case ZATTERA_ASSET_NUM_ZBD:
+      case ZATTERA_ASSET_NUM_DOLLAR:
          return a.dollar_balance;
       default:
          FC_ASSERT( false, "invalid symbol" );
@@ -3717,9 +3717,9 @@ asset database::get_savings_liquid_balance( const account_object& a, asset_symbo
 {
    switch( symbol.asset_num )
    {
-      case ZATTERA_ASSET_NUM_ZTR:
+      case ZATTERA_ASSET_NUM_LIQUID:
          return a.savings_liquid_balance;
-      case ZATTERA_ASSET_NUM_ZBD:
+      case ZATTERA_ASSET_NUM_DOLLAR:
          return a.savings_dollar_balance;
       default: // Note no savings balance for SMT per comments in issue 1682.
          FC_ASSERT( !"invalid symbol" );
@@ -3813,10 +3813,10 @@ void database::validate_invariants()const
    try
    {
       const auto& account_idx = get_index<account_index>().indices().get<by_name>();
-      asset total_supply = asset( 0, ZTR_SYMBOL );
-      asset total_dollars = asset( 0, ZBD_SYMBOL );
+      asset total_supply = asset( 0, LIQUID_SYMBOL );
+      asset total_dollars = asset( 0, DOLLAR_SYMBOL );
       asset total_vesting = asset( 0, VESTS_SYMBOL );
-      asset pending_vesting_liquid = asset( 0, ZTR_SYMBOL );
+      asset pending_vesting_liquid = asset( 0, LIQUID_SYMBOL );
       share_type total_vsf_votes = share_type( 0 );
 
       auto gpo = get_dynamic_global_properties();
@@ -3848,9 +3848,9 @@ void database::validate_invariants()const
 
       for( auto itr = convert_request_idx.begin(); itr != convert_request_idx.end(); ++itr )
       {
-         if( itr->amount.symbol == ZTR_SYMBOL )
+         if( itr->amount.symbol == LIQUID_SYMBOL )
             total_supply += itr->amount;
-         else if( itr->amount.symbol == ZBD_SYMBOL )
+         else if( itr->amount.symbol == DOLLAR_SYMBOL )
             total_dollars += itr->amount;
          else
             FC_ASSERT( false, "Encountered illegal symbol in convert_request_object" );
@@ -3860,13 +3860,13 @@ void database::validate_invariants()const
 
       for( auto itr = limit_order_idx.begin(); itr != limit_order_idx.end(); ++itr )
       {
-         if( itr->sell_price.base.symbol == ZTR_SYMBOL )
+         if( itr->sell_price.base.symbol == LIQUID_SYMBOL )
          {
-            total_supply += asset( itr->for_sale, ZTR_SYMBOL );
+            total_supply += asset( itr->for_sale, LIQUID_SYMBOL );
          }
-         else if ( itr->sell_price.base.symbol == ZBD_SYMBOL )
+         else if ( itr->sell_price.base.symbol == DOLLAR_SYMBOL )
          {
-            total_dollars += asset( itr->for_sale, ZBD_SYMBOL );
+            total_dollars += asset( itr->for_sale, DOLLAR_SYMBOL );
          }
       }
 
@@ -3877,9 +3877,9 @@ void database::validate_invariants()const
          total_supply += itr->liquid_balance;
          total_dollars += itr->dollar_balance;
 
-         if( itr->pending_fee.symbol == ZTR_SYMBOL )
+         if( itr->pending_fee.symbol == LIQUID_SYMBOL )
             total_supply += itr->pending_fee;
-         else if( itr->pending_fee.symbol == ZBD_SYMBOL )
+         else if( itr->pending_fee.symbol == DOLLAR_SYMBOL )
             total_dollars += itr->pending_fee;
          else
             FC_ASSERT( false, "found escrow pending fee that is not ZBD or ZTR" );
@@ -3889,9 +3889,9 @@ void database::validate_invariants()const
 
       for( auto itr = savings_withdraw_idx.begin(); itr != savings_withdraw_idx.end(); ++itr )
       {
-         if( itr->amount.symbol == ZTR_SYMBOL )
+         if( itr->amount.symbol == LIQUID_SYMBOL )
             total_supply += itr->amount;
-         else if( itr->amount.symbol == ZBD_SYMBOL )
+         else if( itr->amount.symbol == DOLLAR_SYMBOL )
             total_dollars += itr->amount;
          else
             FC_ASSERT( false, "found savings withdraw that is not ZBD or ZTR" );
