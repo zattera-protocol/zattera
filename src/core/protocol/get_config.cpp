@@ -12,11 +12,11 @@ fc::variant_object get_config()
    fc::mutable_variant_object result;
 
 #ifdef IS_TEST_MODE
-   result["IS_TEST_MODE"] = true;
-   result["TEST_MODE_BLOCK_LIMIT"] = TEST_MODE_BLOCK_LIMIT;
+   result[ "IS_TEST_MODE" ] = true;
 #else
-   result["IS_TEST_MODE"] = false;
+   result[ "IS_TEST_MODE" ] = false;
 #endif
+
    result["DOLLAR_SYMBOL"] = DOLLAR_SYMBOL;
    result["LIQUID_SYMBOL"] = LIQUID_SYMBOL;
    result["VESTS_SYMBOL"] = VESTS_SYMBOL;
@@ -141,6 +141,10 @@ fc::variant_object get_config()
    result["ZATTERA_VOTE_DUST_THRESHOLD"] = ZATTERA_VOTE_DUST_THRESHOLD;
    result["ZATTERA_VOTE_POWER_RESERVE_RATE"] = ZATTERA_VOTE_POWER_RESERVE_RATE;
    result["ZATTERA_VOTE_REGENERATION_SECONDS"] = ZATTERA_VOTE_REGENERATION_SECONDS;
+
+#ifdef IS_TEST_MODE
+   result["TEST_MODE_BLOCK_LIMIT"] = TEST_MODE_BLOCK_LIMIT;
+#endif
 
    return result;
 }
