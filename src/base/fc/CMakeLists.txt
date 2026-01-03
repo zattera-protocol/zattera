@@ -219,7 +219,6 @@ set( fc_sources
      crypto/sha224.cpp
      crypto/sha512.cpp
      crypto/keccak256.cpp
-     vendor/tiny-keccak/keccak.c
      crypto/blowfish.cpp
      crypto/elliptic_common.cpp
      crypto/restartable_sha256.cpp
@@ -242,6 +241,7 @@ set( fc_sources
      reflect/typename.cpp
      vendor/cyoencode-1.0.2/src/CyoDecode.c
      vendor/cyoencode-1.0.2/src/CyoEncode.c
+     vendor/tiny-keccak/keccak.c
      )
 
 file( GLOB_RECURSE fc_headers ${CMAKE_CURRENT_SOURCE_DIR} *.hpp *.h )
