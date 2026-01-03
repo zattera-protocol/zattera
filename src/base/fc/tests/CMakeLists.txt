@@ -11,6 +11,7 @@ add_executable( fc_test
    crypto/hmac_test.cpp
    crypto/rand_test.cpp
    crypto/sha_test.cpp
+   crypto/keccak_test.cpp
    network/ntp_test.cpp
    network/http/websocket_test.cpp
    thread/task_cancel_test.cpp

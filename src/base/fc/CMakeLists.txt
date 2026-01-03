@@ -218,6 +218,8 @@ set( fc_sources
      crypto/sha256.cpp
      crypto/sha224.cpp
      crypto/sha512.cpp
+     crypto/keccak256.cpp
+     vendor/tiny-keccak/keccak.c
      crypto/blowfish.cpp
      crypto/elliptic_common.cpp
      crypto/restartable_sha256.cpp
